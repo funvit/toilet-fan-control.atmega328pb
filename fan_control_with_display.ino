@@ -150,20 +150,38 @@ void setup()
 	//-------------------------
 	// считывание настроек из eeprom
 	Serial.println(F("SETUP loading params from eeprom"));
+
 	uint8_t v = eepromGetDelayBeforeFanOnValue();
 	if (isDelayBeforeFanOnValueValid(v))
 	{
 		cfgDelayBeforeFanOn = v;
 	}
+	else
+	{
+		// невалидное значение в eeprom - переписать дефолтным
+		eepromSaveDelayBeforeFanOnValue(cfgDelayBeforeFanOn);
+	}
+
 	v = eepromGetFanWorkTimeValue();
 	if (isFanWorkTimeValueValid(v))
 	{
 		cfgFanWorkTimeMinutes = v;
 	}
+	else
+	{
+		// невалидное значение в eeprom - переписать дефолтным
+		eepromSaveFanWorkTimeValue(cfgFanWorkTimeMinutes);
+	}
+
 	v = eepromGetFanOnSensorValue();
 	if (isFanOnSensorLevelValueValid(v))
 	{
 		cfgFanOnSensorLevel = v;
+	}
+	else
+	{
+		// невалидное значение в eeprom - переписать дефолтным
+		eepromSaveFanOnSensorValue(cfgFanOnSensorLevel);
 	}
 	// -------------------------
 
