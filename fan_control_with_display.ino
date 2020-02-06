@@ -16,6 +16,25 @@ const unsigned char fanOff[] PROGMEM = {
 	//
 };
 
+// Иконка ветра
+const unsigned char breeze[] PROGMEM = {
+	24, 24,
+	0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x86, 0x86, 0x83, 0x83, 0x83, 0xc7,
+	0xfe, 0x38, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x99, 0x99, 0x99, 0x99, 0x99, 0x99, 0x99, 0x99,
+	0x99, 0x99, 0x19, 0x19, 0x19, 0x19, 0x19, 0x18, 0x18, 0x18, 0x18, 0x18, 0x18, 0x30, 0xf0, 0xc0,
+	0x01, 0x01, 0x01, 0x01, 0x41, 0x61, 0xc1, 0xc1, 0xc1, 0x63, 0x7f, 0x1c, 0x00, 0x00, 0x00, 0x00,
+	0x08, 0x18, 0x18, 0x18, 0x18, 0x0c, 0x0f, 0x03
+	//
+};
+
+// Иконка повтора
+const unsigned char repeat[] PROGMEM = {
+	12, 12,
+	0xfc, 0x04, 0x04, 0x04, 0x84, 0x04, 0x04, 0x1f, 0x0e, 0x04, 0x00, 0xfc, 0x03, 0x00, 0x02, 0x07,
+	0x0f, 0x02, 0x02, 0x02, 0x02, 0x02, 0x02, 0x03
+	//
+};
+
 #define byte uint8_t
 
 // Размеры дисплея в точках
@@ -28,7 +47,7 @@ TroykaOLED display(0x3C, DISPLAY_W, DISPLAY_H);
 // const char GITHUB_URL[] PROGMEM = "https://github.com/funvit/toilet-fan-control.atmega328pb";
 #define GITHUB_URL "https://github.com/funvit/toilet-fan-control.atmega328pb"
 #define VER_MAJOR 0
-#define VER_MINOR 2
+#define VER_MINOR 1
 
 // Ножка сенсора освещенности
 #define LIGHT_SENSOR_PIN A0
@@ -55,17 +74,17 @@ bool isMenuItemSelected = false;
 //------------------------
 // Настройки
 
-// Множитель для значения cfgDelayAfterLightOn, что бы получить значение в секундах.
+// Множитель для значения cfgDelayBeforeFanOn, что бы получить значение в секундах.
 // Позволяет изменять значение на странице меню с установленным шагом.
-#define delayAfterLightOnSecondsMult 10
-// Задержка перед включением реле при появлении света
-byte cfgDelayAfterLightOn = 0; // значение по-умолчанию
-// Длительность работы вытяжки после пропадания света
-byte cfgDelayAfterLightOffMinutes = 5; // значение по-умолчанию
+#define delayBeforeFanOnSecondsMult 10
+// Задержка переб включением реле
+byte cfgDelayBeforeFanOn = 0; // значение по-умолчанию
+// Длительность замкнутого состояния реле
+byte cfgFanWorkTimeMinutes = 5; // значение по-умолчанию
 // Пороговое значение сенсора освещенности,
 // по превышению которого активируется реле.
 // [0=темно, 99=светло]
-byte cfgLightThreshold = 40; // значение по-умолчанию
+byte cfgFanOnSensorLevel = 40; // значение по-умолчанию
 // /--------------------
 
 // uptime (support more than 50 days)
@@ -79,10 +98,10 @@ unsigned int utRollovers = 0;
 
 byte gLight = 0;
 unsigned long exitMenuTimer;
-unsigned long afterLightOnTimer;
-unsigned long afterLightOffTimer;
+unsigned long beforeFanOnTimer;
+unsigned long fanWorkTimer;
 
-bool isFanOn;
+bool isFanOnRepeat;
 
 unsigned long statusTimer = 1;
 unsigned long introTimer = 10 * 1000;
@@ -132,37 +151,37 @@ void setup()
 	// считывание настроек из eeprom
 	Serial.println(F("SETUP loading params from eeprom"));
 
-	uint8_t v = eepromGetDelayValueAfterLightOn();
+	uint8_t v = eepromGetDelayBeforeFanOnValue();
 	if (isDelayBeforeFanOnValueValid(v))
 	{
-		cfgDelayAfterLightOn = v;
+		cfgDelayBeforeFanOn = v;
 	}
 	else
 	{
 		// невалидное значение в eeprom - переписать дефолтным
-		eepromSaveDelayValueAfterLightOn(cfgDelayAfterLightOn);
+		eepromSaveDelayBeforeFanOnValue(cfgDelayBeforeFanOn);
 	}
 
-	v = eepromGetDelayValueAfterLightOff();
+	v = eepromGetFanWorkTimeValue();
 	if (isFanWorkTimeValueValid(v))
 	{
-		cfgDelayAfterLightOffMinutes = v;
+		cfgFanWorkTimeMinutes = v;
 	}
 	else
 	{
 		// невалидное значение в eeprom - переписать дефолтным
-		eepromSaveDelayValueAfterLightOff(cfgDelayAfterLightOffMinutes);
+		eepromSaveFanWorkTimeValue(cfgFanWorkTimeMinutes);
 	}
 
-	v = eepromGetLightThresholdValue();
+	v = eepromGetFanOnSensorValue();
 	if (isFanOnSensorLevelValueValid(v))
 	{
-		cfgLightThreshold = v;
+		cfgFanOnSensorLevel = v;
 	}
 	else
 	{
 		// невалидное значение в eeprom - переписать дефолтным
-		eepromSaveLightThresholdValue(cfgLightThreshold);
+		eepromSaveFanOnSensorValue(cfgFanOnSensorLevel);
 	}
 	// -------------------------
 
@@ -215,7 +234,7 @@ void loop()
 		introTimer = 0;
 	}
 
-	// Для отображения статуса "я живой" контроллера - моргаем светодиодом
+	// Статус (моргаем светодиодом)
 	if (isTimerOut(&statusTimer, delta))
 	{
 		if (digitalRead(STATUS_LED_PIN))
@@ -238,61 +257,54 @@ void loop()
 	}
 
 	// реагирование на превышение порога сенсора
-	if (afterLightOnTimer == 0 && !isFanOn && gLight > eepromGetLightThresholdValue())
+	if (beforeFanOnTimer == 0 && fanWorkTimer == 0 && gLight > eepromGetFanOnSensorValue())
 	{
-		afterLightOnTimer = getDelayBeforeFanForDisplay();
-		afterLightOnTimer *= 1000;
+		beforeFanOnTimer = getDelayBeforeFanForDisplay();
+		beforeFanOnTimer *= 1000;
 
-		Serial.print(F("TIMER setting after-light-on timer value to "));
-		Serial.println(afterLightOnTimer);
+		Serial.print(F("TIMER setting delay timer value to "));
+		Serial.println(beforeFanOnTimer);
 	}
 
 	// таймер задержки перед включением реле
-	if (!isFanOn &&
+	if (fanWorkTimer == 0 &&
 		(
 			// задержка не установлена
-			eepromGetDelayValueAfterLightOn() == 0 ||
+			eepromGetDelayBeforeFanOnValue() == 0 ||
 			// или таймер задержки вышел
-			isTimerOut(&afterLightOnTimer, delta)
+			isTimerOut(&beforeFanOnTimer, delta)
 			//
 			)
 		//
 	)
 	{
-		if (gLight > eepromGetLightThresholdValue())
+		if (gLight > eepromGetFanOnSensorValue())
 		{
+			// установить значение таймера длительности работы вытяжки
+			setFanWorkTimer();
 			// включить реле
-			isFanOn = true;
 			digitalWrite(RELAY_PIN, true);
 			Serial.println(F("RELAY on"));
 		}
-		else
-		{
-			Serial.println(F("NO light, sleeping..."));
-		}
 	}
 
-	if (isFanOn && afterLightOffTimer == 0 && gLight < eepromGetLightThresholdValue())
+	// таймер работы вытяжки
+	if (isTimerOut(&fanWorkTimer, delta))
 	{
-		// установить значение таймера длительности работы вытяжки после выключения света
-		setAfterLightOffTimer();
-	}
-
-	// таймер работы вытяжки истек?
-	if (isTimerOut(&afterLightOffTimer, delta))
-	{
-		if (gLight > eepromGetLightThresholdValue())
+		if (gLight > eepromGetFanOnSensorValue())
 		{
-			// продолжить работу вытяжки, ибо обнаружен свет
+			// пере-установить значение таймера длительности работы вытяжки
+			// ибо сенсор обнаружил свет
+			setFanWorkTimer();
 			Serial.println(F("RELAY on (continuing)"));
-			isFanOn = true;
+			isFanOnRepeat = true;
 		}
 		else
 		{
 			// выключить реле
 			digitalWrite(RELAY_PIN, false);
 			Serial.println(F("RELAY off"));
-			isFanOn = false;
+			isFanOnRepeat = false;
 		}
 	}
 
@@ -312,15 +324,15 @@ void loop()
 	wdt_reset();
 }
 
-// установить значение таймера длительности работы вытяжки после выключения света
-void setAfterLightOffTimer()
+// установить значение таймера длительности работы вытяжки
+void setFanWorkTimer()
 {
-	afterLightOffTimer = eepromGetDelayValueAfterLightOff();
+	fanWorkTimer = eepromGetFanWorkTimeValue();
 	// значение хранится в минутах. конвертировать в миллисекунды.
-	afterLightOffTimer = afterLightOffTimer * 60 * 1000;
+	fanWorkTimer = fanWorkTimer * 60 * 1000;
 
-	Serial.print(F("TIMER setting after-light-off timer value to "));
-	Serial.println(afterLightOffTimer);
+	Serial.print(F("TIMER setting fan work timer value to "));
+	Serial.println(fanWorkTimer);
 }
 
 /** Функция для проверки срабатывания таймера
@@ -357,7 +369,7 @@ bool isTimerOut(uint32_t *t, uint32_t delta)
 bool isDelayBeforeFanOnValueValid(byte v)
 {
 	// необходимо использовать коэффициент
-	bool ok = v * delayAfterLightOnSecondsMult >= 0 && v * delayAfterLightOnSecondsMult <= 60 * 5;
+	bool ok = v * delayBeforeFanOnSecondsMult >= 0 && v * delayBeforeFanOnSecondsMult <= 60 * 5;
 	// Serial.print(F("VALIDATOR delay before fan on is valid: "));
 	// Serial.println(F(ok));
 	return ok;
@@ -404,7 +416,7 @@ void displayDefaultPage()
 	{
 		display.drawPixel(
 			1 + (countersAmount - i) * 4,
-			11 - round(cfgLightThreshold / 11.0 + 0.49),
+			11 - round(cfgFanOnSensorLevel / 11.0 + 0.49),
 			1);
 	}
 
@@ -421,56 +433,54 @@ void displayDefaultPage()
 	// вывод значений
 	display.print(gLight);
 	display.print(F("/"));
-	byte cfgLightThreshold = eepromGetLightThresholdValue();
-	if (cfgLightThreshold <= 9)
+	byte cfgFanOnSensorLevel = eepromGetFanOnSensorValue();
+	if (cfgFanOnSensorLevel <= 9)
 	{
 		display.print(F(" "));
 	}
-	display.print(cfgLightThreshold);
+	display.print(cfgFanOnSensorLevel);
 
-	// основная часть экрана
-	if (isFanOn)
+	// вывод состояния на основную чать дисплея
+	display.drawImage(fanOff, 0, 16, 1);
+
+	if (fanWorkTimer > 0)
 	{
-		// вытяжка включена
+		// вытяжка включена - вывод таймера до отключения
+		display.drawImage(breeze, 26, 16, 1);
 
-		// вывод иконки вентилятора
-		display.drawImage(fanOff, 0, 16, 1);
+		if (isFanOnRepeat)
+		{
+			display.drawImage(repeat, 54, 22, 1);
+		}
 
-		if (afterLightOffTimer > 0)
+		// значение таймера
+		display.setFont(mediumNumbers);
+		byte x = 80;
+		if (fanWorkTimer / 1000 < 100)
 		{
-			// вывод значения таймера после пропадания света
-			display.setFont(mediumNumbers);
-			byte x = 80;
-			if (afterLightOffTimer / 1000 < 100)
-			{
-				x += display.getFontWidth();
-			}
-			if (afterLightOffTimer / 1000 < 10)
-			{
-				x += display.getFontWidth();
-			}
-			display.print(afterLightOffTimer / 1000, x, 21);
-			byte fw = display.getFontWidth();
-			display.setFont(fontRus6x8);
-			display.print(F("С."), 80 + 3 * fw, 30);
+			x += display.getFontWidth();
 		}
-		else
+		if (fanWorkTimer / 1000 < 10)
 		{
-			display.print(F("ВЕНТИЛИРОВАНИЕ"), 30, 24);
+			x += display.getFontWidth();
 		}
+		display.print(fanWorkTimer / 1000, x, 21);
+		byte fw = display.getFontWidth();
+		display.setFont(fontRus6x8);
+		display.print(F("С."), 80 + 3 * fw, 30);
 	}
 	else
 	{
-		if (afterLightOnTimer > 0)
+		if (beforeFanOnTimer > 0)
 		{
 			// вывод таймера задержки перед включением
 			display.print(F("ЗАДЕРЖКА "), 30, 24);
-			display.print(afterLightOnTimer / 1000);
+			display.print(beforeFanOnTimer / 1000);
 		}
 		else
 		{
 			// вытяжка выключена - состояние ожидания
-			display.print(F("ОЖИДАНИЕ"), 40, 24);
+			display.print(F("ОЖИДАНИЕ"), 30, 24);
 		}
 	}
 
@@ -510,9 +520,9 @@ void displayDefaultPage()
 void displayMenu()
 {
 	byte *menuValues[3] = {
-		&cfgDelayAfterLightOn,
-		&cfgDelayAfterLightOffMinutes,
-		&cfgLightThreshold,
+		&cfgDelayBeforeFanOn,
+		&cfgFanWorkTimeMinutes,
+		&cfgFanOnSensorLevel,
 	};
 	bool (*validators[])(byte v) = {
 		isDelayBeforeFanOnValueValid,
@@ -535,9 +545,9 @@ void displayMenu()
 				if (isMenuItemSelected)
 				{
 					// отменить изменения (считать текущие сохраненные значения из eeprom)
-					cfgDelayAfterLightOn = eepromGetDelayValueAfterLightOn();
-					cfgDelayAfterLightOffMinutes = eepromGetDelayValueAfterLightOff();
-					cfgLightThreshold = eepromGetLightThresholdValue();
+					cfgDelayBeforeFanOn = eepromGetDelayBeforeFanOnValue();
+					cfgFanWorkTimeMinutes = eepromGetFanWorkTimeValue();
+					cfgFanOnSensorLevel = eepromGetFanOnSensorValue();
 
 					isMenuItemSelected = false;
 				}
@@ -607,13 +617,13 @@ void displayMenu()
 					switch (menuIdx)
 					{
 					case 1:
-						eepromSaveDelayValueAfterLightOn(cfgDelayAfterLightOn);
+						eepromSaveDelayBeforeFanOnValue(cfgDelayBeforeFanOn);
 						break;
 					case 2:
-						eepromSaveDelayValueAfterLightOff(cfgDelayAfterLightOffMinutes);
+						eepromSaveFanWorkTimeValue(cfgFanWorkTimeMinutes);
 						break;
 					case 3:
-						eepromSaveLightThresholdValue(cfgLightThreshold);
+						eepromSaveFanOnSensorValue(cfgFanOnSensorLevel);
 						break;
 					}
 
@@ -704,7 +714,7 @@ void displayMenu()
 		display.invertText(true);
 		drawFocus(valuesX, 40, 5);
 	}
-	v = cfgDelayAfterLightOffMinutes;
+	v = cfgFanWorkTimeMinutes;
 	display.setCursor(valuesX + display.getFontWidth(), 40);
 	if (v <= 9)
 	{
@@ -721,7 +731,7 @@ void displayMenu()
 		display.invertText(true);
 		drawFocus(valuesX, 56, 5);
 	}
-	v = cfgLightThreshold;
+	v = cfgFanOnSensorLevel;
 	display.setCursor(valuesX + display.getFontWidth(), 56);
 	if (v <= 9)
 	{
@@ -763,7 +773,7 @@ void drawFocus(byte x, byte y, byte digits)
 // Так как значение хранится в eeprom в виде byte (0-255), то используется коэффициент.
 uint16_t getDelayBeforeFanForDisplay()
 {
-	return cfgDelayAfterLightOn * (uint8_t)delayAfterLightOnSecondsMult;
+	return cfgDelayBeforeFanOn * (uint8_t)delayBeforeFanOnSecondsMult;
 }
 
 // Страница дисплея с интро
