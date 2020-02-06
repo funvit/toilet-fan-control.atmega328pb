@@ -1,29 +1,29 @@
 #include <EEPROM.h>
 #define byte uint8_t
 
-byte eepromGetDelayValueAfterLightOn()
+byte eepromGetDelayBeforeFanOnValue()
 {
 	return EEPROM.read(0);
 }
-void eepromSaveDelayValueAfterLightOn(byte v)
+void eepromSaveDelayBeforeFanOnValue(byte v)
 {
 	EEPROM.write(0, v);
 }
 
-byte eepromGetDelayValueAfterLightOff()
+byte eepromGetFanWorkTimeValue()
 {
 	return EEPROM.read(1);
 }
-void eepromSaveDelayValueAfterLightOff(byte v)
+void eepromSaveFanWorkTimeValue(byte v)
 {
 	EEPROM.write(1, v);
 }
 
-byte eepromGetLightThresholdValue()
+byte eepromGetFanOnSensorValue()
 {
 	return EEPROM.read(2);
 }
-void eepromSaveLightThresholdValue(byte v)
+void eepromSaveFanOnSensorValue(byte v)
 {
 	EEPROM.write(2, v);
 }
