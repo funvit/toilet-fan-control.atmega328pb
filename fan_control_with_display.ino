@@ -127,7 +127,7 @@ uint32_t introTimer = 10 * 1000;
 uint32_t lgTimer = LG_TIMER;
 static uint64_t lg = 0;
 
-#define SCREENSAVER 10 * 1000
+#define SCREENSAVER 10 * 1000 // кол-во секунд перед запуском screensaver-а
 
 //------------------------
 // debug, debugln
