@@ -1,3 +1,4 @@
+#include "./menu_item.h"
 #include "./src/KeyMatrix/KeyMatrix.h"
 #include "./src/TroykaOLED/TroykaOLED.h"
 #include "./storage.h"
@@ -76,6 +77,7 @@ KeyMatrix keypad((char *)keymap, (byte)2, (byte)2, rowPins, colPins);
 // Глобальные переменные
 //------------------------
 
+#define MENU_ITEMS 3
 byte menuIdx = 0;
 #define MENU_ITEM_STATE_SELECTED 1
 #define MENU_ITEM_STATE_EDIT 2
@@ -151,6 +153,8 @@ static uint64_t lg = 0;
 #define debugln(x) ((void)0)
 #endif
 
+MenuItem menu[MENU_ITEMS];
+
 // ===========================================
 // Стандартная функция перед вызовом loop().
 // ===========================================
@@ -214,6 +218,27 @@ void setup() {
     eepromSaveFanOnSensorValue(cfgFanOnSensorLevel);
   }
   // -------------------------
+
+  char *menuItem1Title[3] PROGMEM = {"Пауза до", "включения", ""};
+  MenuItem m1 = MenuItem(menuItem1Title, "с.");
+  m1.setValue(&cfgDelayBeforeFanOn);
+  m1.setValidator(&isDelayBeforeFanOnValueValid);
+  m1.setDisplayer(&getDelayBeforeFanForDisplay);
+  menu[0] = m1;
+
+  char *menuItem2Title[3] PROGMEM = {"Длительно-", "сть работы", "вент."};
+  MenuItem m2 = MenuItem(menuItem2Title, "м.");
+  m2.setValue(&cfgFanWorkTimeMinutes);
+  m2.setValidator(&isFanWorkTimeValueValid);
+  m2.setDisplayer(&getFanWorkTimeForDisplay);
+  menu[1] = m2;
+
+  char *menuItem3Title[3] PROGMEM = {"Порог", "датчика", "света"};
+  MenuItem m3 = MenuItem(menuItem3Title, "%");
+  m3.setValue(&cfgFanOnSensorLevel);
+  m3.setValidator(&isFanOnSensorLevelValueValid);
+  m3.setDisplayer(&getFanOnSensorLevelForDisplay);
+  menu[2] = m3;
 
   debugln(F("SETUP done"));
   debugln(F(""));
@@ -388,7 +413,7 @@ bool isTimerOut(uint32_t *t, uint32_t delta) {
 }
 
 // Валидатор значения задержки перед запуском вытяжки.
-bool isDelayBeforeFanOnValueValid(byte seconds) {
+bool isDelayBeforeFanOnValueValid(uint8_t seconds) {
   // необходимо использовать коэффициент
   bool ok = seconds * delayBeforeFanOnSecondsMult >= 0 &&
             seconds * delayBeforeFanOnSecondsMult <= 60 * 5;
@@ -396,13 +421,13 @@ bool isDelayBeforeFanOnValueValid(byte seconds) {
 }
 
 // Валидатор длительности работы вытяжки.
-bool isFanWorkTimeValueValid(byte minutes) {
+bool isFanWorkTimeValueValid(uint8_t minutes) {
   bool ok = minutes >= 0 && minutes <= 15;
   return ok;
 }
 
 // Валидатор порогового значения датчика.
-bool isFanOnSensorLevelValueValid(byte percent) {
+bool isFanOnSensorLevelValueValid(uint8_t percent) {
   bool ok = percent > 0 && percent < 99;
   return ok;
 }
@@ -411,6 +436,8 @@ bool isFanOnSensorLevelValueValid(byte percent) {
 void displayMainView() {
   // debugln(F("DISPLAY main view"));
   display.clearDisplay();
+  display.invertDisplay(false);
+  display.invertText(false);
 
   byte countersAmount = 15;
   uint64_t _lg = lg;
@@ -513,6 +540,8 @@ void displayMainView() {
 // Экран меню.
 void displayMenuView() {
   // debugln(F("DISPLAY menu view"));
+
+  display.clearDisplay();
 
   byte menuItemSignal = 0;
 
@@ -619,6 +648,7 @@ void displayMenuView() {
 
   // ---
   display.setCursor(0, 0);
+  display.invertText(false);
   display.print(F("МЕНЮ"));
   if (exitMenuTimer > 0 && exitMenuTimer < 5 * 1000) {
     display.print(F("    выход через "));
@@ -630,12 +660,23 @@ void displayMenuView() {
   byte valuesX = 98;
 
   // Вывод элементов меню
-  menuItem1(menuItemPassValueForSameIdx(menuItemState, 1),
-            menuItemPassValueForSameIdx(menuItemSignal, 1));
-  menuItem2(menuItemPassValueForSameIdx(menuItemState, 2),
-            menuItemPassValueForSameIdx(menuItemSignal, 2));
-  menuItem3(menuItemPassValueForSameIdx(menuItemState, 3),
-            menuItemPassValueForSameIdx(menuItemSignal, 3));
+  if (0 < menuIdx && menuIdx <= MENU_ITEMS) {
+    drawMenuItem(&menu[menuIdx - 1],
+                 menuItemPassValueForSameIdx(menuItemState, menuIdx),
+                 menuItemPassValueForSameIdx(menuItemSignal, menuIdx));
+  }
+
+  // Вывод текущей позиции меню
+  byte menuItems = 4;
+  byte menuPagerItemWidth = DISPLAY_W / menuItems;
+  for (byte i = 0; i < DISPLAY_W; i += 2) {
+    display.drawPixel(i, 14, WHITE);
+  }
+
+  for (byte i = 0; i < 3; i++) {
+    display.drawLine(menuPagerItemWidth * (menuIdx - 1) + 2, 13 + i,
+                     menuPagerItemWidth * (menuIdx)-2, 13 + i, WHITE);
+  }
 
   display.update();
 }
@@ -647,135 +688,57 @@ byte menuItemPassValueForSameIdx(byte val, byte idx) {
   return val;
 }
 
-void menuItem1(byte state, byte signal) {
-  byte valueXPos = 98;
-
+void drawMenuItem(MenuItem *item, byte state, byte signal) {
   display.invertText(false);
+  display.setFont(fontRus12x10);
 
-  if (state == MENU_ITEM_STATE_SELECTED || state == MENU_ITEM_STATE_EDIT) {
-    display.drawImage(arrowRight, 0, 20, 1);
+  for (byte i = 0; i < 3; i++) {
+    char *t = item->getTitle(i);
+    display.print(t, 0, 15 * i + 15);
   }
-
-  display.print(F("Задержка перед"), 8, 16);
-  display.print(F("вкл. вент."), 8, 24);
 
   if (state == MENU_ITEM_STATE_EDIT) {
     if (signal == MENU_ITEM_SIGNAL_INC) {
-      if (isDelayBeforeFanOnValueValid(cfgDelayBeforeFanOn + 1)) {
-        cfgDelayBeforeFanOn += 1;
+      uint8_t v = item->getValue();
+      if (item->validate(v + 1)) {
+        item->incValue();
       }
     }
     if (signal == MENU_ITEM_SIGNAL_DEC) {
-      if (isDelayBeforeFanOnValueValid(cfgDelayBeforeFanOn - 1)) {
-        cfgDelayBeforeFanOn -= 1;
+      uint8_t v = item->getValue();
+      if (item->validate(v - 1)) {
+        item->decValue();
       }
     }
   }
+
+  int16_t displayVal = item->display();
+
+  byte maxValueDigits = 1;
+  int16_t v = displayVal;
+  for (size_t i = 0; v >= 10; i++) {
+    v /= 10;
+    if (v > 0) {
+      maxValueDigits++;
+    }
+  }
+
+  byte totalDigits = maxValueDigits + strlen(item->getSuffix());
 
   if (state == MENU_ITEM_STATE_EDIT) {
     // Значение выбрано для изменения - инвертировать и подсветить текст
     display.invertText(true);
-    drawMenuValueFocus(valueXPos, 20, 5);
+    display.setCursor(DISPLAY_W - display.getFontWidth() * totalDigits - 6, 48);
   }
 
-  int16_t displayVal = getDelayBeforeFanForDisplay();
-
-  // Значение из 3 цифр
-  display.setCursor(valueXPos, 20);
-  if (displayVal <= 9) {
-    display.print(F(" "));
-  }
-  if (displayVal <= 99) {
-    display.print(F(" "));
-  }
+  display.setCursor(DISPLAY_W - (display.getFontWidth() * totalDigits) - 2, 48);
   display.print(displayVal);
-  display.print(F("с."));
+  display.print(item->getSuffix());
 }
 
-void menuItem2(byte state, byte signal) {
-  byte valueXPos = 98;
-
-  display.invertText(false);
-
-  if (state == MENU_ITEM_STATE_SELECTED || state == MENU_ITEM_STATE_EDIT) {
-    display.drawImage(arrowRight, 0, 40, 1);
-  }
-
-  display.print(F("Длительность"), 8, 36);
-  display.print(F("работы вент."), 8, 44);
-
-  if (state == MENU_ITEM_STATE_EDIT) {
-    if (signal == MENU_ITEM_SIGNAL_INC) {
-      if (isFanWorkTimeValueValid(cfgFanWorkTimeMinutes + 1)) {
-        cfgFanWorkTimeMinutes += 1;
-      }
-    }
-    if (signal == MENU_ITEM_SIGNAL_DEC) {
-      if (isFanWorkTimeValueValid(cfgFanWorkTimeMinutes - 1)) {
-        cfgFanWorkTimeMinutes -= 1;
-      }
-    }
-  }
-
-  if (state == MENU_ITEM_STATE_EDIT) {
-    // Значение выбрано для изменения - инвертировать и подсветить текст
-    display.invertText(true);
-    drawMenuValueFocus(valueXPos, 40, 5);
-  }
-
-  int16_t displayVal = cfgFanWorkTimeMinutes;
-
-  // Значение из 2 цифр
-  display.setCursor(valueXPos + display.getFontWidth(), 40);
-  if (displayVal <= 9) {
-    display.print(F(" "));
-  }
-  display.print(displayVal);
-  display.print(F("м."));
-}
-
-void menuItem3(byte state, byte signal) {
-  byte valueXPos = 98;
-
-  display.invertText(false);
-
-  if (state == MENU_ITEM_STATE_SELECTED || state == MENU_ITEM_STATE_EDIT) {
-    display.drawImage(arrowRight, 0, 56, 1);
-  }
-
-  display.print(F("Порог датчика"), 8, 56);
-
-  if (state == MENU_ITEM_STATE_EDIT) {
-    if (signal == MENU_ITEM_SIGNAL_INC) {
-      if (isFanOnSensorLevelValueValid(cfgFanOnSensorLevel + 1)) {
-        cfgFanOnSensorLevel += 1;
-      }
-    }
-    if (signal == MENU_ITEM_SIGNAL_DEC) {
-      if (isFanOnSensorLevelValueValid(cfgFanOnSensorLevel - 1)) {
-        cfgFanOnSensorLevel -= 1;
-      }
-    }
-  }
-
-  if (state == MENU_ITEM_STATE_EDIT) {
-    // Значение выбрано для изменения - инвертировать и подсветить текст
-    display.invertText(true);
-    drawMenuValueFocus(valueXPos, 56, 5);
-  }
-
-  int16_t displayVal = cfgFanOnSensorLevel;
-
-  // Значение из 2 цифр
-  display.setCursor(valueXPos + display.getFontWidth(), 56);
-  if (displayVal <= 9) {
-    display.print(F(" "));
-  }
-  display.print(displayVal);
-  display.print(F("%"));
-}
-
-// Рисует залитый прямоугольник
+// Рисует залитый прямоугольник.
+//
+// X, Y, Кол-во знаков.
 void drawMenuValueFocus(byte x, byte y, byte digits) {
   display.drawRect(x - 2, y - 1, x + digits * display.getFontWidth() + 2,
                    y + display.getFontHeight() + 1, true, 1);
@@ -788,6 +751,10 @@ void drawMenuValueFocus(byte x, byte y, byte digits) {
 uint16_t getDelayBeforeFanForDisplay() {
   return cfgDelayBeforeFanOn * (uint8_t)delayBeforeFanOnSecondsMult;
 }
+
+uint16_t getFanWorkTimeForDisplay() { return cfgFanWorkTimeMinutes; }
+
+uint16_t getFanOnSensorLevelForDisplay() { return cfgFanOnSensorLevel; }
 
 // Экран интро (отображается один раз при запуске устройства).
 //
