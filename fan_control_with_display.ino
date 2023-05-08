@@ -45,7 +45,7 @@ TroykaOLED display(0x3C, DISPLAY_W, DISPLAY_H);
 
 #define GITHUB_URL "https://github.com/funvit/toilet-fan-control.atmega328pb"
 #define VER_MAJOR 0
-#define VER_MINOR 4
+#define VER_MINOR 5
 #define VER_PATCH "menu"
 
 // Ножка сенсора освещенности
