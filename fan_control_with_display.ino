@@ -262,25 +262,29 @@ void setup() {
   delay(100);
 
   MenuItem m1 = MenuItem(Menu1, TextSecondSmall, 0, 30, 1);
-  m1.setValuePtr(&cfgDelayBeforeFanOn);
+  m1.setValue(cfgDelayBeforeFanOn);
+  m1.setUpdateOnValueChange(&cfgDelayBeforeFanOn);
   m1.setDisplayer(&getDelayBeforeFanForDisplay);
   menu[0] = m1;
   // debugln(F("Init menu: item 1 ok"));
 
   MenuItem m2 = MenuItem(Menu2, TextMinuteSmall, 1, 15, 1);
-  m2.setValuePtr(&cfgFanWorkDurationMinutes);
+  m2.setValue(cfgFanWorkDurationMinutes);
+  m2.setUpdateOnValueChange(&cfgFanWorkDurationMinutes);
   m2.setDisplayer(&getFanWorkTimeForDisplay);
   menu[1] = m2;
   // debugln(F("Init menu: item 2 ok"));
 
   MenuItem m3 = MenuItem(Menu3, TextPercentSmall, 1, 99, 1);
-  m3.setValuePtr(&cfgFanOnSensorLevel);
+  m3.setValue(cfgFanOnSensorLevel);
+  m3.setUpdateOnValueChange(&cfgFanOnSensorLevel);
   m3.setDisplayer(&getFanOnSensorLevelForDisplay);
   menu[2] = m3;
   // debugln(F("Init menu: item 3 ok"));
 
   MenuItem m4 = MenuItem(Menu4, 0, 0, 255, 15);
-  m4.setValuePtr(&cfgDisplayBrigtness);
+  m4.setValue(cfgDisplayBrigtness);
+  m4.setUpdateOnValueChange(&cfgDisplayBrigtness);
   m4.setDisplayer(&getDisplayBrigtnessForDisplay);
   m4.setOnValueChange(&setDisplayBrigtness);
   menu[3] = m4;
@@ -365,7 +369,7 @@ void loop() {
 
   // реагирование на превышение порога сенсора
   if (beforeFanOnTimer == 0 && fanWorkTimer == 0 &&
-      gLight > eepromGetFanOnSensorValue()) {
+      gLight > cfgFanOnSensorLevel) {
     beforeFanOnTimer = getDelayBeforeFanForDisplay();
     beforeFanOnTimer *= 1000;
 
@@ -377,14 +381,14 @@ void loop() {
   if (fanWorkTimer == 0 && \ 
     (
           // задержка не установлена
-          eepromGetDelayBeforeFanOnValue() == 0 ||
+          cfgDelayBeforeFanOn == 0 ||
           // или таймер задержки вышел
           isTimerOut(&beforeFanOnTimer, delta)
           //
           )
       //
   ) {
-    if (gLight > eepromGetFanOnSensorValue()) {
+    if (gLight > cfgFanOnSensorLevel) {
       // установить значение таймера длительности работы вытяжки
       setFanWorkTimer();
       // включить реле
@@ -395,7 +399,7 @@ void loop() {
 
   // таймер работы вытяжки
   if (isTimerOut(&fanWorkTimer, delta)) {
-    if (gLight > eepromGetFanOnSensorValue()) {
+    if (gLight > cfgFanOnSensorLevel) {
       // пере-установить значение таймера длительности работы вытяжки
       // ибо сенсор обнаружил свет
       setFanWorkTimer();
@@ -462,7 +466,7 @@ uint16_t countDigits(uint16_t v) {
 
 // Установить значение таймера длительности работы вытяжки.
 void setFanWorkTimer() {
-  fanWorkTimer = eepromGetFanWorkDurationValue();
+  fanWorkTimer = cfgFanWorkDurationMinutes;
   // значение хранится в минутах. конвертировать в миллисекунды.
   fanWorkTimer = fanWorkTimer * 60 * 1000;
 
@@ -550,7 +554,7 @@ void displayMainView() {
   // вывод значений
   display.print(gLight);
   display.print(TextDelimiter);
-  byte cfgFanOnSensorLevel = eepromGetFanOnSensorValue();
+  // byte cfgFanOnSensorLevel = eepromGetFanOnSensorValue();
   if (cfgFanOnSensorLevel <= 9) {
     display.print(TextSpace);
   }
@@ -605,7 +609,6 @@ void displayMainView() {
       switch (keypad.event.c) {
       case 'a':
         // нажата кнопка "меню"
-
         debugln(F("VIEW main: menu key pressed"));
         menuIdx = 1;
         display.clearDisplay();
