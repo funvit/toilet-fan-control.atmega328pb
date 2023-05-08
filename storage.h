@@ -10,11 +10,11 @@ void eepromSaveDelayBeforeFanOnValue(byte v)
 	EEPROM.write(0, v);
 }
 
-byte eepromGetFanWorkTimeValue()
+byte eepromGetFanWorkDurationValue()
 {
 	return EEPROM.read(1);
 }
-void eepromSaveFanWorkTimeValue(byte v)
+void eepromSaveFanWorkDurationValue(byte v)
 {
 	EEPROM.write(1, v);
 }
@@ -26,4 +26,13 @@ byte eepromGetFanOnSensorValue()
 void eepromSaveFanOnSensorValue(byte v)
 {
 	EEPROM.write(2, v);
+}
+
+byte eepromGetDisplayBrigtnessValue()
+{
+	return EEPROM.read(3);
+}
+void eepromSaveDisplayBrigtnessValue(byte v)
+{
+	EEPROM.write(3, v);
 }

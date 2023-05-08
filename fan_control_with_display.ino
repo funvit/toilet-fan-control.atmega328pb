@@ -1,3 +1,7 @@
+/*
+  Keep this file in win-1251 encoding!
+*/
+
 #include "./menu_item.h"
 #include "./src/KeyMatrix/KeyMatrix.h"
 #include "./src/TroykaOLED/TroykaOLED.h"
@@ -6,19 +10,7 @@
 #include <Wire.h>
 #include <avr/wdt.h>
 
-// РРєРѕРЅРєР° РІРµРЅС‚РёР»СЏС‚РѕСЂР°
-const unsigned char fanOff[] PROGMEM = {
-    24,   24,   0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x0c,
-    0x1c, 0x7e, 0xfe, 0xfe, 0xfe, 0xfe, 0xfe, 0xfc, 0xf8, 0xf0, 0x00,
-    0x00, 0x00, 0x00, 0x00, 0x00, 0xf0, 0xfc, 0xfc, 0xfe, 0xfe, 0xfe,
-    0xfe, 0xc6, 0x30, 0x7c, 0x7d, 0xfd, 0x7d, 0x7d, 0x83, 0xc7, 0xc7,
-    0x81, 0x80, 0x80, 0x80, 0x80, 0x00, 0x00, 0x01, 0x07, 0x0f, 0x1f,
-    0x1f, 0x1f, 0x07, 0x01, 0x00, 0x00, 0x0e, 0x1e, 0x3f, 0x7f, 0x7f,
-    0x7f, 0x7f, 0x7f, 0x3f, 0x1f, 0x0f, 0x03, 0x00
-    //
-};
-
-// РРєРѕРЅРєР° РІРµС‚СЂР°
+// Иконка ветра
 const unsigned char breeze[] PROGMEM = {
     24,   24,   0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80, 0x80,
     0x80, 0x86, 0x86, 0x83, 0x83, 0x83, 0xc7, 0xfe, 0x38, 0x00, 0x00,
@@ -30,7 +22,7 @@ const unsigned char breeze[] PROGMEM = {
     //
 };
 
-// РРєРѕРЅРєР° РїРѕРІС‚РѕСЂР°
+// Иконка повтора
 const unsigned char repeat[] PROGMEM = {
     12,   12,   0xfc, 0x04, 0x04, 0x04, 0x84, 0x04, 0x04,
     0x1f, 0x0e, 0x04, 0x00, 0xfc, 0x03, 0x00, 0x02, 0x07,
@@ -40,11 +32,13 @@ const unsigned char repeat[] PROGMEM = {
 
 #define byte uint8_t
 
-// Р Р°Р·РјРµСЂС‹ РґРёСЃРїР»РµСЏ РІ С‚РѕС‡РєР°С…
+// Размеры дисплея в точках
 #define DISPLAY_W 128
 #define DISPLAY_H 64
 
-// РРЅРёС†РёР°Р»РёР·Р°С†РёСЏ РѕР±СЉРµРєС‚Р° РґРёСЃРїР»РµСЏ СЃ Р°РґСЂРµСЃРѕРј Рё СЂР°Р·РјРµСЂР°РјРё
+#define DISPLAY_MAX_BRIGTNESS 255
+
+// Инициализация объекта дисплея с адресом и размерами
 TroykaOLED display(0x3C, DISPLAY_W, DISPLAY_H);
 
 #define GITHUB_URL "https://github.com/funvit/toilet-fan-control.atmega328pb"
@@ -52,32 +46,34 @@ TroykaOLED display(0x3C, DISPLAY_W, DISPLAY_H);
 #define VER_MINOR 4
 #define VER_PATCH "menu"
 
-// РќРѕР¶РєР° СЃРµРЅСЃРѕСЂР° РѕСЃРІРµС‰РµРЅРЅРѕСЃС‚Рё
+// Ножка сенсора освещенности
 #define LIGHT_SENSOR_PIN A0
-// РќРѕР¶РєР° СѓРїСЂР°РІР»РµРЅРёСЏ СЂРµР»Рµ (РёСЃРїРѕР»СЊР·СѓР№С‚Рµ С‚СЂР°РЅР·РёСЃС‚РѕСЂ!)
+// Ножка управления реле (используйте транзистор!)
 #define RELAY_PIN 2
-// РќРѕР¶РєР° СЃР±СЂРѕСЃР° РґРёСЃРїР»РµСЏ.
-// РњРѕР№ РґРёСЃРїР»РµР№ РёРјРµРµС‚ РїРёРЅ RESET, РµРіРѕ РЅРµРѕР±С…РѕРґРёРјРѕ СѓСЃС‚Р°РЅР°РІР»РёРІР°С‚СЊ РІ 1 РїРѕСЃР»Рµ СЃС‚Р°СЂС‚Р°
-// СѓСЃС‚СЂРѕР№СЃС‚РІР°. РРЅР°С‡Рµ РЅР° СЌРєСЂР°РЅРµ Р±СѓРґРµС‚ РјСѓСЃРѕСЂ.
+// Ножка сброса дисплея.
+// Мой дисплей имеет пин RESET, его необходимо устанавливать в 1 после старта
+// устройства. Иначе на экране будет мусор.
 #define DISPLAY_RESET_PIN 4
 // Built in led pin
 #define STATUS_LED_PIN 13
 
 //------------------------
-// РњР°С‚СЂРёС†Р° РєРЅРѕРїРѕРє.
+// Матрица кнопок.
 //------------------------
 
-// РҐРѕС‚СЏ РєРЅРѕРїРѕРє РІСЃРµРіРѕ 4 - РїСЂРѕС‰Рµ РёСЃРїРѕР»СЊР·РѕРІР°С‚СЊ Р±РёР±Р»РёРѕС‚РµРєСѓ СЂР°Р±РѕС‚С‹ СЃ РјР°С‚СЂРёС†РѕР№ РєРЅРѕРїРѕРє.
+// Хотя кнопок всего 4 - проще использовать библиотеку работы с матрицой
+// кнопок.
 char keymap[2][2] = {{'a', 'b'}, {'c', 'd'}};
 byte rowPins[2] = {5, 6};
 byte colPins[2] = {7, 8};
 KeyMatrix keypad((char *)keymap, (byte)2, (byte)2, rowPins, colPins);
 
 //------------------------
-// Р“Р»РѕР±Р°Р»СЊРЅС‹Рµ РїРµСЂРµРјРµРЅРЅС‹Рµ
+// Глобальные переменные
 //------------------------
 
-#define MENU_ITEMS 3
+// Меню
+#define MENU_ITEMS 4
 byte menuIdx = 0;
 #define MENU_ITEM_STATE_SELECTED 1
 #define MENU_ITEM_STATE_EDIT 2
@@ -85,6 +81,30 @@ byte menuItemState = MENU_ITEM_STATE_SELECTED;
 #define MENU_ITEM_SIGNAL_INC 1
 #define MENU_ITEM_SIGNAL_DEC 2
 #define MENU_ITEM_SIGNAL_SAVE 3
+
+const char *Menu1[3] = {"Пауза до", "включения", ""};
+const char *Menu2[3] = {"Длительно-", "сть работы", "вент."};
+const char *Menu3[3] = {"Порог", "датчика", "света"};
+const char *Menu4[3] = {"Яркость", "экрана", ""};
+
+// Тексты
+const char *TextSpace = " ";
+const char *TextDelimiter = "/";
+const char *TextMainScreenDelayMode = "ПАУЗА";
+const char *TextMainScreenWaitMode = "ОЖИДАНИЕ";
+const char *TextMinuteBig = "М.";
+const char *TextMinuteSmall = "м.";
+const char *TextSecondBig = "C.";
+const char *TextSecondSmall = "c.";
+const char *TextPercentSmall = "%";
+const char *TextMenu = "МЕНЮ";
+const char *TextMenuExitAfter = "выход через";
+const char *TextVersion = "версия:";
+const char *TextVersionDot = ".";
+const char *TextVersionMinus = "-";
+const char *TextVentilation = "Вентиляция";
+const char *TextSceensaver = "РЕЖИМ СНА ЭКРАНА";
+const char *TextLight = "СВЕТ:";
 
 // screen saver
 bool screensaverTimerInited = false;
@@ -102,20 +122,22 @@ bool isFanOnRepeat;
 uint32_t menuSavedMarkTimer = 0;
 
 //------------------------
-// РќР°СЃС‚СЂРѕР№РєРё.
+// Настройки.
 //------------------------
 
-// РњРЅРѕР¶РёС‚РµР»СЊ РґР»СЏ Р·РЅР°С‡РµРЅРёСЏ cfgDelayBeforeFanOn, С‡С‚Рѕ Р±С‹ РїРѕР»СѓС‡РёС‚СЊ Р·РЅР°С‡РµРЅРёРµ РІ
-// СЃРµРєСѓРЅРґР°С…. РџРѕР·РІРѕР»СЏРµС‚ РёР·РјРµРЅСЏС‚СЊ Р·РЅР°С‡РµРЅРёРµ РЅР° СЃС‚СЂР°РЅРёС†Рµ РјРµРЅСЋ СЃ СѓСЃС‚Р°РЅРѕРІР»РµРЅРЅС‹Рј С€Р°РіРѕРј.
+// Множитель для значения cfgDelayBeforeFanOn, что бы получить значение в
+// секундах. Позволяет изменять значение на странице меню с установленным шагом.
 #define delayBeforeFanOnSecondsMult 10
-// Р—Р°РґРµСЂР¶РєР° РїРµСЂРµРґ РІРєР»СЋС‡РµРЅРёРµРј СЂРµР»Рµ
-byte cfgDelayBeforeFanOn = 0; // Р·РЅР°С‡РµРЅРёРµ РїРѕ-СѓРјРѕР»С‡Р°РЅРёСЋ
-// Р”Р»РёС‚РµР»СЊРЅРѕСЃС‚СЊ Р·Р°РјРєРЅСѓС‚РѕРіРѕ СЃРѕСЃС‚РѕСЏРЅРёСЏ СЂРµР»Рµ
-byte cfgFanWorkTimeMinutes = 5; // Р·РЅР°С‡РµРЅРёРµ РїРѕ-СѓРјРѕР»С‡Р°РЅРёСЋ
-// РџРѕСЂРѕРіРѕРІРѕРµ Р·РЅР°С‡РµРЅРёРµ СЃРµРЅСЃРѕСЂР° РѕСЃРІРµС‰РµРЅРЅРѕСЃС‚Рё,
-// РїРѕ РїСЂРµРІС‹С€РµРЅРёСЋ РєРѕС‚РѕСЂРѕРіРѕ Р°РєС‚РёРІРёСЂСѓРµС‚СЃСЏ СЂРµР»Рµ.
-// [0=С‚РµРјРЅРѕ, 99=СЃРІРµС‚Р»Рѕ]
-byte cfgFanOnSensorLevel = 40; // Р·РЅР°С‡РµРЅРёРµ РїРѕ-СѓРјРѕР»С‡Р°РЅРёСЋ
+// Задержка перед включением реле
+byte cfgDelayBeforeFanOn = 0; // значение по-умолчанию
+// Длительность замкнутого состояния реле
+byte cfgFanWorkDurationMinutes = 5; // значение по-умолчанию
+// Пороговое значение сенсора освещенности,
+// по превышению которого активируется реле.
+// [0=темно, 99=светло]
+byte cfgFanOnSensorLevel = 40; // значение по-умолчанию
+// Яркость экрана
+byte cfgDisplayBrigtness = 4;
 // /--------------------
 
 // uptime (support more than 50 days)
@@ -134,7 +156,7 @@ uint32_t introTimer = 10 * 1000;
 uint32_t lgTimer = LG_TIMER;
 static uint64_t lg = 0;
 
-// РљРѕР»-РІРѕ СЃРµРєСѓРЅРґ РїРµСЂРµРґ Р·Р°РїСѓСЃРєРѕРј screensaver-Р°.
+// Кол-во секунд перед запуском screensaver-а.
 // 0 = disabled.
 // FIXME: enable screensaver
 // #define SCREENSAVER 10 * 1000
@@ -156,111 +178,136 @@ static uint64_t lg = 0;
 MenuItem menu[MENU_ITEMS];
 
 // ===========================================
-// РЎС‚Р°РЅРґР°СЂС‚РЅР°СЏ С„СѓРЅРєС†РёСЏ РїРµСЂРµРґ РІС‹Р·РѕРІРѕРј loop().
+// Стандартная функция перед вызовом loop().
 // ===========================================
 //
-// РСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ РґР»СЏ РёРЅРёС†РёР°Р»РёР·Р°С†РёРё РґРёСЃРїР»РµСЏ
-// Рё СѓСЃС‚Р°РЅРѕРІРєРё РЅР°С‡Р°Р»СЊРЅС‹С… Р·РЅР°С‡РµРЅРёР№ РіР»РѕР±Р°Р»СЊРЅС‹С… РїРµСЂРµРјРµРЅРЅС‹С….
+// Используется для инициализации дисплея
+// и установки начальных значений глобальных переменных.
 void setup() {
   Serial.begin(9600);
+  Serial.println(F("======================="));
+  Serial.println(F("BOOT"));
 
   Serial.println(F("PROJECT Toilet fan controller"));
   Serial.println(F("SETUP start"));
 
-  // РЎС‚РѕСЂРѕР¶РµРІРѕР№ С‚Р°Р№РјРµСЂ
+  // Сторожевой таймер
   wdt_enable(WDTO_2S);
 
-  // РЈСЃС‚Р°РЅРѕРІРєР° СЂРµР¶РёРјР° РЅРѕР¶РµРє
+  // Установка режима ножек
   pinMode(RELAY_PIN, OUTPUT);
   pinMode(DISPLAY_RESET_PIN, OUTPUT);
   pinMode(STATUS_LED_PIN, OUTPUT);
 
-  // РїРѕСЃР»Р°С‚СЊ РЅР° РїРѕСЂС‚ RESET РґРёСЃРїР»РµСЏ СЃРёРіРЅР°Р».
-  // РёРЅР°С‡Рµ Р±СѓРґРµС‚ РІС‹РІРѕРґРёС‚СЊСЃСЏ РјСѓСЃРѕСЂ!
+  // послать на порт RESET дисплея сигнал.
+  // иначе будет выводиться мусор!
   delay(10);
   digitalWrite(DISPLAY_RESET_PIN, 1);
   delay(10);
 
-  // РёРЅРёС†РёР°Р»РёР·РёСЂСѓРµРј РґРёСЃРїР»РµР№
+  // инициализируем дисплей
   display.begin();
-  // РІС‹Р±РёСЂР°РµРј РєРѕРґРёСЂРѕРІРєСѓ СЃРёРјРІРѕР»РѕРІ: CP866, TXT_UTF8 РёР»Рё WIN1251
-  display.setCoding(TXT_UTF8);
-  // РЅРµ РѕР±РЅРѕРІР»СЏС‚СЊ Р°РІС‚РѕРјР°С‚РёС‡РµСЃРєРё. С‚РѕР»СЊРєРѕ РїСЂРё РІС‹Р·РѕРІРµ update().
+  // выбираем кодировку символов: CP866, TXT_UTF8 или WIN1251
+  display.setCoding(TXT_WIN1251);
+  // не обновлять автоматически. только при вызове update().
   display.autoUpdate(false);
-  // СѓРјРµРЅСЊС€РёС‚СЊ СЏСЂРєРѕСЃС‚СЊ (С‚ Рє СЌРєСЂР°РЅ - СЌС‚Рѕ РІРїРѕРјРѕРіР°С‚РµР»СЊРЅРѕРµ СѓСЃС‚СЂРѕР№СЃС‚РІРѕ, РЅРµ РѕСЃРЅРѕРІРЅРѕРµ)
-  display.setBrigtness(10);
+  display.setBrigtness(1); // default
 
   //-------------------------
-  // СЃС‡РёС‚С‹РІР°РЅРёРµ РЅР°СЃС‚СЂРѕРµРє РёР· eeprom
+  // считывание настроек из eeprom
   debugln(F("SETUP loading params from eeprom"));
 
   uint8_t v = eepromGetDelayBeforeFanOnValue();
-  if (isDelayBeforeFanOnValueValid(v)) {
-    cfgDelayBeforeFanOn = v;
-  } else {
-    // РЅРµРІР°Р»РёРґРЅРѕРµ Р·РЅР°С‡РµРЅРёРµ РІ eeprom - РїРµСЂРµРїРёСЃР°С‚СЊ РґРµС„РѕР»С‚РЅС‹Рј
-    eepromSaveDelayBeforeFanOnValue(cfgDelayBeforeFanOn);
-  }
+  // FIXME: fix validator somehow
+  // if (isDelayBeforeFanOnValueValid(v)) {
+  // debugln(F("EEPROM: delay before fan loaded"));
+  cfgDelayBeforeFanOn = v;
+  // } else {
+  //   // невалидное значение в eeprom - переписать дефолтным
+  //   eepromSaveDelayBeforeFanOnValue(cfgDelayBeforeFanOn);
+  // }
 
-  v = eepromGetFanWorkTimeValue();
-  if (isFanWorkTimeValueValid(v)) {
-    cfgFanWorkTimeMinutes = v;
+  v = eepromGetFanWorkDurationValue();
+  if (isFanWorkDurationValueValid(v)) {
+    // debugln(F("EEPROM: fan work duration loaded"));
+    cfgFanWorkDurationMinutes = v;
   } else {
-    // РЅРµРІР°Р»РёРґРЅРѕРµ Р·РЅР°С‡РµРЅРёРµ РІ eeprom - РїРµСЂРµРїРёСЃР°С‚СЊ РґРµС„РѕР»С‚РЅС‹Рј
-    eepromSaveFanWorkTimeValue(cfgFanWorkTimeMinutes);
+    // невалидное значение в eeprom - переписать дефолтным
+    eepromSaveFanWorkDurationValue(cfgFanWorkDurationMinutes);
   }
 
   v = eepromGetFanOnSensorValue();
   if (isFanOnSensorLevelValueValid(v)) {
+    // debugln(F("EEPROM: sensor level loaded"));
     cfgFanOnSensorLevel = v;
   } else {
-    // РЅРµРІР°Р»РёРґРЅРѕРµ Р·РЅР°С‡РµРЅРёРµ РІ eeprom - РїРµСЂРµРїРёСЃР°С‚СЊ РґРµС„РѕР»С‚РЅС‹Рј
+    // невалидное значение в eeprom - переписать дефолтным
     eepromSaveFanOnSensorValue(cfgFanOnSensorLevel);
+  }
+
+  v = eepromGetDisplayBrigtnessValue();
+  if (isDisplayBrigtnessValueValid(v)) {
+    delay(100);
+    cfgDisplayBrigtness = v;
+    display.setBrigtness(v);
+  } else {
+    // невалидное значение в eeprom - переписать дефолтным
+    eepromSaveDisplayBrigtnessValue(cfgDisplayBrigtness);
   }
   // -------------------------
 
-  char *menuItem1Title[3] PROGMEM = {"РџР°СѓР·Р° РґРѕ", "РІРєР»СЋС‡РµРЅРёСЏ", ""};
-  MenuItem m1 = MenuItem(menuItem1Title, "СЃ.");
-  m1.setValue(&cfgDelayBeforeFanOn);
-  m1.setValidator(&isDelayBeforeFanOnValueValid);
+  // =========================
+  // МЕНЮ
+  debugln(F("Init menu"));
+  delay(100);
+
+  MenuItem m1 = MenuItem(Menu1, TextSecondSmall, 0, 30, 1);
+  m1.setValuePtr(&cfgDelayBeforeFanOn);
   m1.setDisplayer(&getDelayBeforeFanForDisplay);
   menu[0] = m1;
+  // debugln(F("Init menu: item 1 ok"));
 
-  char *menuItem2Title[3] PROGMEM = {"Р”Р»РёС‚РµР»СЊРЅРѕ-", "СЃС‚СЊ СЂР°Р±РѕС‚С‹", "РІРµРЅС‚."};
-  MenuItem m2 = MenuItem(menuItem2Title, "Рј.");
-  m2.setValue(&cfgFanWorkTimeMinutes);
-  m2.setValidator(&isFanWorkTimeValueValid);
+  MenuItem m2 = MenuItem(Menu2, TextMinuteSmall, 1, 15, 1);
+  m2.setValuePtr(&cfgFanWorkDurationMinutes);
   m2.setDisplayer(&getFanWorkTimeForDisplay);
   menu[1] = m2;
+  // debugln(F("Init menu: item 2 ok"));
 
-  char *menuItem3Title[3] PROGMEM = {"РџРѕСЂРѕРі", "РґР°С‚С‡РёРєР°", "СЃРІРµС‚Р°"};
-  MenuItem m3 = MenuItem(menuItem3Title, "%");
-  m3.setValue(&cfgFanOnSensorLevel);
-  m3.setValidator(&isFanOnSensorLevelValueValid);
+  MenuItem m3 = MenuItem(Menu3, TextPercentSmall, 1, 99, 1);
+  m3.setValuePtr(&cfgFanOnSensorLevel);
   m3.setDisplayer(&getFanOnSensorLevelForDisplay);
   menu[2] = m3;
+  // debugln(F("Init menu: item 3 ok"));
+
+  MenuItem m4 = MenuItem(Menu4, 0, 0, 255, 15);
+  m4.setValuePtr(&cfgDisplayBrigtness);
+  m4.setDisplayer(&getDisplayBrigtnessForDisplay);
+  m4.setOnValueChange(&setDisplayBrigtness);
+  menu[3] = m4;
+  // debugln(F("Init menu: item 4 ok"));
+  // /===================
 
   debugln(F("SETUP done"));
   debugln(F(""));
 }
 
 // ===========================================
-// РћСЃРЅРѕРІРЅРѕР№ С†РёРєР» РїСЂРѕРіСЂР°РјРјС‹.
+// Основной цикл программы.
 // ===========================================
 void loop() {
   unsigned long startAt = millis();
 
   updateUptime();
 
-  // РџРѕР»СѓС‡РµРЅРёРµ Р·РЅР°С‡РµРЅРёСЏ СЃРµРЅСЃРѕСЂР° РѕСЃРІРµС‰РµРЅРЅРѕСЃС‚Рё
+  // Получение значения сенсора освещенности
   gLight = round((1023 - analogRead(LIGHT_SENSOR_PIN)) / 10.3);
 
-  // Р’С‹Р±РѕСЂ СЃС‚СЂР°РЅРёС†С‹ РґР»СЏ РѕС‚РѕР±СЂР°Р¶РµРЅРёСЏ РЅР° РґРёСЃРїР»РµРµ
+  // Выбор страницы для отображения на дисплее
   if (introTimer > 0) {
     displayIntroPage();
   } else {
     if (menuIdx == 0) {
-      // РћС‚РѕР±СЂР°Р·РёС‚СЊ РіР»Р°РІРЅС‹Р№ СЌРєСЂР°РЅ.
+      // Отобразить главный экран.
 
       if (screensaver) {
         screensaverTimerInited = false;
@@ -274,18 +321,18 @@ void loop() {
         displayMainView();
       }
     } else {
-      // РћС‚РѕР±СЂР°Р·РёС‚СЊ СЌРєСЂР°РЅ РјРµРЅСЋ.
+      // Отобразить экран меню.
       screensaver = false;
       screensaverTimerInited = false;
       displayMenuView();
     }
   }
 
-  // РїРѕРґСЃС‡РµС‚ РґРµР»СЊС‚С‹ РґР»СЏ С‚Р°Р№РјРµСЂРѕРІ
+  // подсчет дельты для таймеров
   unsigned long m = millis();
   unsigned long delta = 0;
   if (startAt > m) {
-    // РµСЃР»Рё Р·РЅР°С‡РµРЅРёРµ Р°РїС‚Р°Р№РјР° РїСЂРµРІС‹СЃРёР»Рѕ СЂР°Р·РјРµСЂРЅРѕСЃС‚СЊ РїРµСЂРµРјРµРЅРЅРѕР№
+    // если значение аптайма превысило размерность переменной
     delta = 1 << 32 - startAt + m;
   } else {
     delta = m - startAt;
@@ -295,7 +342,7 @@ void loop() {
     introTimer = 0;
   }
 
-  // РЎС‚Р°С‚СѓСЃ (РјРѕСЂРіР°РµРј СЃРІРµС‚РѕРґРёРѕРґРѕРј)
+  // Статус (моргаем светодиодом)
   if (isTimerOut(&statusTimer, delta)) {
     if (digitalRead(STATUS_LED_PIN)) {
       digitalWrite(STATUS_LED_PIN, 0);
@@ -306,7 +353,7 @@ void loop() {
     }
   }
 
-  // С‚Р°Р№РјРµСЂ РІС‹С…РѕРґР° РёР· РјРµРЅСЋ РїРѕ Р±РµР·РґРµР№СЃС‚РІРёСЋ
+  // таймер выхода из меню по бездействию
   if (isTimerOut(&exitMenuTimer, delta)) {
     menuIdx = 0;
     menuItemState = MENU_ITEM_STATE_SELECTED;
@@ -316,46 +363,46 @@ void loop() {
     screensaver = true;
   }
 
-  // СЂРµР°РіРёСЂРѕРІР°РЅРёРµ РЅР° РїСЂРµРІС‹С€РµРЅРёРµ РїРѕСЂРѕРіР° СЃРµРЅСЃРѕСЂР°
+  // реагирование на превышение порога сенсора
   if (beforeFanOnTimer == 0 && fanWorkTimer == 0 &&
       gLight > eepromGetFanOnSensorValue()) {
     beforeFanOnTimer = getDelayBeforeFanForDisplay();
     beforeFanOnTimer *= 1000;
 
-    debug(F("TIMER setting delay timer value to "));
-    debugln(beforeFanOnTimer);
+    // debug(F("TIMER setting delay timer value to "));
+    // debugln(beforeFanOnTimer);
   }
 
-  // С‚Р°Р№РјРµСЂ Р·Р°РґРµСЂР¶РєРё РїРµСЂРµРґ РІРєР»СЋС‡РµРЅРёРµРј СЂРµР»Рµ
+  // таймер задержки перед включением реле
   if (fanWorkTimer == 0 && \ 
     (
-          // Р·Р°РґРµСЂР¶РєР° РЅРµ СѓСЃС‚Р°РЅРѕРІР»РµРЅР°
+          // задержка не установлена
           eepromGetDelayBeforeFanOnValue() == 0 ||
-          // РёР»Рё С‚Р°Р№РјРµСЂ Р·Р°РґРµСЂР¶РєРё РІС‹С€РµР»
+          // или таймер задержки вышел
           isTimerOut(&beforeFanOnTimer, delta)
           //
           )
       //
   ) {
     if (gLight > eepromGetFanOnSensorValue()) {
-      // СѓСЃС‚Р°РЅРѕРІРёС‚СЊ Р·РЅР°С‡РµРЅРёРµ С‚Р°Р№РјРµСЂР° РґР»РёС‚РµР»СЊРЅРѕСЃС‚Рё СЂР°Р±РѕС‚С‹ РІС‹С‚СЏР¶РєРё
+      // установить значение таймера длительности работы вытяжки
       setFanWorkTimer();
-      // РІРєР»СЋС‡РёС‚СЊ СЂРµР»Рµ
+      // включить реле
       digitalWrite(RELAY_PIN, true);
       debugln(F("RELAY on"));
     }
   }
 
-  // С‚Р°Р№РјРµСЂ СЂР°Р±РѕС‚С‹ РІС‹С‚СЏР¶РєРё
+  // таймер работы вытяжки
   if (isTimerOut(&fanWorkTimer, delta)) {
     if (gLight > eepromGetFanOnSensorValue()) {
-      // РїРµСЂРµ-СѓСЃС‚Р°РЅРѕРІРёС‚СЊ Р·РЅР°С‡РµРЅРёРµ С‚Р°Р№РјРµСЂР° РґР»РёС‚РµР»СЊРЅРѕСЃС‚Рё СЂР°Р±РѕС‚С‹ РІС‹С‚СЏР¶РєРё
-      // РёР±Рѕ СЃРµРЅСЃРѕСЂ РѕР±РЅР°СЂСѓР¶РёР» СЃРІРµС‚
+      // пере-установить значение таймера длительности работы вытяжки
+      // ибо сенсор обнаружил свет
       setFanWorkTimer();
       debugln(F("RELAY on (continuing)"));
       isFanOnRepeat = true;
     } else {
-      // РІС‹РєР»СЋС‡РёС‚СЊ СЂРµР»Рµ
+      // выключить реле
       digitalWrite(RELAY_PIN, false);
       debugln(F("RELAY off"));
       isFanOnRepeat = false;
@@ -372,30 +419,67 @@ void loop() {
     lgTimer = LG_TIMER;
   }
 
-  // РЎР±СЂРѕСЃ СЃС‚РѕСЂРѕР¶РµРІРѕРіРѕ С‚Р°Р№РјРµСЂР°
+  // Сброс сторожевого таймера
   wdt_reset();
 }
 
-// РЈСЃС‚Р°РЅРѕРІРёС‚СЊ Р·РЅР°С‡РµРЅРёРµ С‚Р°Р№РјРµСЂР° РґР»РёС‚РµР»СЊРЅРѕСЃС‚Рё СЂР°Р±РѕС‚С‹ РІС‹С‚СЏР¶РєРё.
-void setFanWorkTimer() {
-  fanWorkTimer = eepromGetFanWorkTimeValue();
-  // Р·РЅР°С‡РµРЅРёРµ С…СЂР°РЅРёС‚СЃСЏ РІ РјРёРЅСѓС‚Р°С…. РєРѕРЅРІРµСЂС‚РёСЂРѕРІР°С‚СЊ РІ РјРёР»Р»РёСЃРµРєСѓРЅРґС‹.
-  fanWorkTimer = fanWorkTimer * 60 * 1000;
-
-  debug(F("TIMER setting fan work timer value to "));
-  debugln(fanWorkTimer);
+uint16_t getStrWidthForDisplay(char *str) {
+  return strlen(str) * display.getFontWidth();
 }
 
-/** Р¤СѓРЅРєС†РёСЏ РґР»СЏ РїСЂРѕРІРµСЂРєРё СЃСЂР°Р±Р°С‚С‹РІР°РЅРёСЏ С‚Р°Р№РјРµСЂР°.
+uint16_t getStrWidthForDisplay(const char *str) {
+  return strlen(str) * display.getFontWidth();
+}
+
+uint16_t getStrWidthForDisplay(String str) {
+  return str.length() * display.getFontWidth();
+}
+
+uint16_t getXForDisplayTextCentered(char *str) {
+  uint16_t c = getStrWidthForDisplay(str);
+  if (c > display.getWidth()) {
+    return 0;
+  }
+  return (display.getWidth() - c) / 2;
+}
+
+uint16_t getXForDisplayTextCentered(const char *str) {
+  uint16_t c = getStrWidthForDisplay(str);
+  if (c > display.getWidth()) {
+    return 0;
+  }
+  return (display.getWidth() - c) / 2;
+}
+
+uint16_t countDigits(uint16_t v) {
+  uint16_t r = 1;
+  for (size_t i = 0; v >= 10; i++) {
+    r++;
+    v /= 10;
+  }
+  return r;
+}
+
+// Установить значение таймера длительности работы вытяжки.
+void setFanWorkTimer() {
+  fanWorkTimer = eepromGetFanWorkDurationValue();
+  // значение хранится в минутах. конвертировать в миллисекунды.
+  fanWorkTimer = fanWorkTimer * 60 * 1000;
+
+  // debug(F("TIMER setting fan work timer value to "));
+  // debugln(fanWorkTimer);
+}
+
+/** Функция для проверки срабатывания таймера.
  *
- * РЈРјРµРЅСЊС€Р°РµС‚ Р·РЅР°С‡РµРЅРёРµ С‚Р°Р№РјРµСЂР° РЅР° РґРµР»СЊС‚Сѓ. РџСЂРё РґРѕСЃС‚РёР¶РµРЅРёРё РЅСѓР»СЏ - РІРѕР·РІСЂР°С‰СЏРµС‚ true.
+ * Уменьшает значение таймера на дельту. При достижении нуля - возвращяет true.
  *
- * Р•СЃР»Рё Р·РЅР°С‡РµРЅРёРµ СѓР¶Рµ СЂР°РІРЅРѕ 0 - С‚Рѕ РІРµСЂРЅРµС‚ false (РґР»СЏ РёР·Р±РµР¶Р°РЅРёСЏ РїРѕРІСЂРѕСЂРЅС‹С… Р»РѕР¶РЅС‹С…
- * СЃСЂР°Р±Р°С‚С‹РІР°РЅРёР№).
+ * Если значение уже равно 0 - то вернет false (для избежания поврорных ложных
+ * срабатываний).
  *
- * @param t С‚Р°Р№РјРµСЂ (РІ РјРёР»Р»РёСЃРµРєСѓРЅРґР°С…)
- * @param delta РІСЂРµРјСЏ РІ РјРёР»Р»РёСЃРµРєСѓРЅРґР°С…, РїСЂРѕС€РµРґС€РµРµ СЃ РїСЂРµРґС‹РґСѓС‰РµР№ РїСЂРѕРІРµСЂРєРё. РћР±С‹С‡РЅРѕ
- * СЌС‚Рѕ РґРµР»СЊС‚Р° РёР· loop().
+ * @param t таймер (в миллисекундах)
+ * @param delta время в миллисекундах, прошедшее с предыдущей проверки. Обычно
+ * это дельта из loop().
  */
 bool isTimerOut(uint32_t *t, uint32_t delta) {
   if (*t > 0) {
@@ -412,29 +496,29 @@ bool isTimerOut(uint32_t *t, uint32_t delta) {
   return false;
 }
 
-// Р’Р°Р»РёРґР°С‚РѕСЂ Р·РЅР°С‡РµРЅРёСЏ Р·Р°РґРµСЂР¶РєРё РїРµСЂРµРґ Р·Р°РїСѓСЃРєРѕРј РІС‹С‚СЏР¶РєРё.
-bool isDelayBeforeFanOnValueValid(uint8_t seconds) {
-  // РЅРµРѕР±С…РѕРґРёРјРѕ РёСЃРїРѕР»СЊР·РѕРІР°С‚СЊ РєРѕСЌС„С„РёС†РёРµРЅС‚
-  bool ok = seconds * delayBeforeFanOnSecondsMult >= 0 &&
-            seconds * delayBeforeFanOnSecondsMult <= 60 * 5;
-  return ok;
-}
-
-// Р’Р°Р»РёРґР°С‚РѕСЂ РґР»РёС‚РµР»СЊРЅРѕСЃС‚Рё СЂР°Р±РѕС‚С‹ РІС‹С‚СЏР¶РєРё.
-bool isFanWorkTimeValueValid(uint8_t minutes) {
+// Валидатор длительности работы вытяжки.
+bool isFanWorkDurationValueValid(uint8_t minutes) {
   bool ok = minutes >= 0 && minutes <= 15;
   return ok;
 }
 
-// Р’Р°Р»РёРґР°С‚РѕСЂ РїРѕСЂРѕРіРѕРІРѕРіРѕ Р·РЅР°С‡РµРЅРёСЏ РґР°С‚С‡РёРєР°.
+// Валидатор порогового значения датчика.
 bool isFanOnSensorLevelValueValid(uint8_t percent) {
   bool ok = percent > 0 && percent < 99;
   return ok;
 }
 
-// Р“Р»Р°РІРЅС‹Р№ СЌРєСЂР°РЅ РґРёСЃРїР»РµСЏ.
+bool isDisplayBrigtnessValueValid(uint8_t n) {
+  if (n >= 1 && n <= DISPLAY_MAX_BRIGTNESS) {
+    return true;
+  }
+  return false;
+}
+
+// Главный экран дисплея.
 void displayMainView() {
-  // debugln(F("DISPLAY main view"));
+  debugln(F("DISPLAY main view"));
+
   display.clearDisplay();
   display.invertDisplay(false);
   display.invertText(false);
@@ -455,35 +539,26 @@ void displayMainView() {
   }
 
   display.setFont(fontRus6x8);
-  // РёРЅС„РѕСЂРјР°С†РёСЏ РѕС‚ СЃРµРЅСЃРѕСЂР°
-  display.print(F("РЎР’Р•Рў:"), 6 * 11 + 2, 3);
+  // информация от сенсора
+  display.print(TextLight, 6 * 11 + 2, 3);
 
   display.setCursor(6 * 16 + 2, 3);
   if (gLight <= 9) {
-    display.print(F(" "));
+    display.print(TextSpace);
   }
 
-  // РІС‹РІРѕРґ Р·РЅР°С‡РµРЅРёР№
+  // вывод значений
   display.print(gLight);
-  display.print(F("/"));
+  display.print(TextDelimiter);
   byte cfgFanOnSensorLevel = eepromGetFanOnSensorValue();
   if (cfgFanOnSensorLevel <= 9) {
-    display.print(F(" "));
+    display.print(TextSpace);
   }
   display.print(cfgFanOnSensorLevel);
 
-  // РІС‹РІРѕРґ СЃРѕСЃС‚РѕСЏРЅРёСЏ РЅР° РѕСЃРЅРѕРІРЅСѓСЋ С‡Р°С‚СЊ РґРёСЃРїР»РµСЏ
-  display.drawImage(fanOff, 0, 16, 1);
-
+  // вывод состояния на основную чать дисплея
   if (fanWorkTimer > 0) {
-    // РІС‹С‚СЏР¶РєР° РІРєР»СЋС‡РµРЅР° - РІС‹РІРѕРґ С‚Р°Р№РјРµСЂР° РґРѕ РѕС‚РєР»СЋС‡РµРЅРёСЏ
-    display.drawImage(breeze, 26, 16, 1);
-
-    if (isFanOnRepeat) {
-      display.drawImage(repeat, 54, 22, 1);
-    }
-
-    // Р·РЅР°С‡РµРЅРёРµ С‚Р°Р№РјРµСЂР°
+    // вытяжка включена - вывод таймера до отключения
     display.setFont(mediumNumbers);
     byte x = 80;
     if (fanWorkTimer / 1000 < 100) {
@@ -495,35 +570,41 @@ void displayMainView() {
     display.print(fanWorkTimer / 1000, x, 21);
     byte fw = display.getFontWidth();
     display.setFont(fontRus6x8);
-    display.print(F("РЎ."), 80 + 3 * fw, 30);
+    display.print(TextSecondBig, 80 + 3 * fw, 30);
   } else {
     if (beforeFanOnTimer > 0) {
-      // РІС‹РІРѕРґ С‚Р°Р№РјРµСЂР° Р·Р°РґРµСЂР¶РєРё РїРµСЂРµРґ РІРєР»СЋС‡РµРЅРёРµРј
-      display.print(F("Р—РђР”Р•Р Р–РљРђ "), 30, 24);
-      display.print(beforeFanOnTimer / 1000);
+      // вывод таймера задержки перед включением
+      display.setFont(fontRus12x10);
+      display.print(TextMainScreenDelayMode, 0, 24);
+      uint16_t v = beforeFanOnTimer / 1000;
+      display.print(
+          beforeFanOnTimer / 1000,
+          display.getWidth() - countDigits(v) * display.getFontWidth(), 24);
     } else {
-      // РІС‹С‚СЏР¶РєР° РІС‹РєР»СЋС‡РµРЅР° - СЃРѕСЃС‚РѕСЏРЅРёРµ РѕР¶РёРґР°РЅРёСЏ
-      display.print(F("РћР–РР”РђРќРР•"), 30, 24);
+      display.setFont(fontRus12x10);
+      // вытяжка выключена - состояние ожидания
+      display.print(TextMainScreenWaitMode,
+                    getXForDisplayTextCentered(TextMainScreenWaitMode), 24);
     }
   }
 
   // uptime
   display.setFont(fontRus6x8);
   String uptime = uptimeForDisplay();
-  size_t len = display.getTextLength(uptime);
-  display.setCursor(display.getWidth() - len * display.getFontWidth(),
-                    DISPLAY_H - display.getFontHeight());
+  display.setCursor(display.getWidth() - getStrWidthForDisplay(uptime) -
+                        (30 - utSecond / 2),
+                    display.getHeigth() - display.getFontHeight());
   display.print(uptime);
 
   display.update();
 
-  // РљРЅРѕРїРєРё
+  // Кнопки
   if (keypad.pollEvent()) {
-    // РµСЃС‚СЊ СЃРѕР±С‹С‚РёРµ, РѕР±СЂР°Р±Р°С‚С‹РІР°РµРј
+    // есть событие, обрабатываем
     if (keypad.event.type == KM_KEYDOWN) {
       switch (keypad.event.c) {
       case 'a':
-        // РЅР°Р¶Р°С‚Р° РєРЅРѕРїРєР° "РјРµРЅСЋ"
+        // нажата кнопка "меню"
 
         debugln(F("VIEW main: menu key pressed"));
         menuIdx = 1;
@@ -537,58 +618,58 @@ void displayMainView() {
   }
 }
 
-// Р­РєСЂР°РЅ РјРµРЅСЋ.
+// Экран меню.
 void displayMenuView() {
-  // debugln(F("DISPLAY menu view"));
+  debugln(F("DISPLAY menu view"));
 
   display.clearDisplay();
 
   byte menuItemSignal = 0;
 
-  // РљРЅРѕРїРєРё
+  // Кнопки
   if (keypad.pollEvent()) {
-    // СѓСЃС‚Р°РЅРѕРІРєР° С‚Р°Р№РјРµСЂР° РїРѕ Р±РµР·РґРµР№СЃС‚РІРёСЋ
+    // установка таймера по бездействию
     exitMenuTimer = 20 * 1000;
 
     if (keypad.event.type == KM_KEYDOWN) {
       switch (keypad.event.c) {
-      case 'a': // РєРЅРѕРїРєР° "menu" СЂР°Р±РѕС‚Р°РµС‚ РєР°Рє РѕС‚РјРµРЅР°
+      case 'a': // кнопка "menu" работает как отмена
         if (menuItemState == MENU_ITEM_STATE_EDIT) {
-          // РѕС‚РјРµРЅРёС‚СЊ РёР·РјРµРЅРµРЅРёСЏ (СЃС‡РёС‚Р°С‚СЊ С‚РµРєСѓС‰РёРµ СЃРѕС…СЂР°РЅРµРЅРЅС‹Рµ Р·РЅР°С‡РµРЅРёСЏ РёР· eeprom)
+          // отменить изменения (считать текущие сохраненные значения из eeprom)
           cfgDelayBeforeFanOn = eepromGetDelayBeforeFanOnValue();
-          cfgFanWorkTimeMinutes = eepromGetFanWorkTimeValue();
+          cfgFanWorkDurationMinutes = eepromGetFanWorkDurationValue();
           cfgFanOnSensorLevel = eepromGetFanOnSensorValue();
 
           menuItemState = MENU_ITEM_STATE_SELECTED;
         } else {
-          // РІС‹Р№С‚Рё СЃРѕ СЃС‚СЂР°РЅРёС†С‹
+          // выйти со страницы
           menuIdx = 0;
           menuItemState = MENU_ITEM_STATE_SELECTED;
           menuItemSignal = 0;
         }
         break;
 
-      case 'b': // РєРЅРѕРїРєР° "-"
+      case 'b': // кнопка "-"
         if (menuIdx > 0 && menuItemState == MENU_ITEM_STATE_EDIT) {
-          // СѓРјРµРЅСЊС€РёС‚СЊ РІС‹Р±СЂР°РЅРЅРѕРµ Р·РЅР°С‡РµРЅРёРµ
+          // уменьшить выбранное значение
           menuItemSignal = MENU_ITEM_SIGNAL_DEC;
         } else {
-          // РїРµСЂРµРјРµС‰РµРЅРёРµ РїРѕ РјРµРЅСЋ "РІРІРµСЂС…"
+          // перемещение по меню "вверх"
           if (menuIdx == 1) {
-            menuIdx = 3;
+            menuIdx = MENU_ITEMS;
           } else {
             menuIdx -= 1;
           }
         }
         break;
 
-      case 'c': // РєРЅРѕРїРєР° "+"
+      case 'c': // кнопка "+"
         if (menuIdx > 0 && menuItemState == MENU_ITEM_STATE_EDIT) {
-          // СѓРІРµР»РёС‡РёС‚СЊ РІС‹Р±СЂР°РЅРЅРѕРµ Р·РЅР°С‡РµРЅРёРµ
+          // увеличить выбранное значение
           menuItemSignal = MENU_ITEM_SIGNAL_INC;
         } else {
-          // РїРµСЂРµРјРµС‰РµРЅРёРµ РїРѕ РјРµРЅСЋ "РІРЅРёР·"
-          if (menuIdx >= 3) {
+          // перемещение по меню "вниз"
+          if (menuIdx >= MENU_ITEMS) {
             menuIdx = 1;
           } else {
             menuIdx += 1;
@@ -596,9 +677,9 @@ void displayMenuView() {
         }
         break;
 
-      case 'd': // РєРЅРѕРїРєР° "ok"
+      case 'd': // кнопка "ok"
         if (menuItemState == MENU_ITEM_STATE_EDIT) {
-          // СЃРѕС…СЂР°РЅРµРЅРёРµ РІС‹Р±СЂР°РЅРЅРѕРіРѕ Р·РЅР°С‡РµРЅРёСЏ
+          // сохранение выбранного значения
           debugln(F("CONFIG saving to eeprom..."));
 
           menuItemSignal = MENU_ITEM_SIGNAL_SAVE;
@@ -608,10 +689,13 @@ void displayMenuView() {
             eepromSaveDelayBeforeFanOnValue(cfgDelayBeforeFanOn);
             break;
           case 2:
-            eepromSaveFanWorkTimeValue(cfgFanWorkTimeMinutes);
+            eepromSaveFanWorkDurationValue(cfgFanWorkDurationMinutes);
             break;
           case 3:
             eepromSaveFanOnSensorValue(cfgFanOnSensorLevel);
+            break;
+          case 4:
+            eepromSaveDisplayBrigtnessValue(cfgDisplayBrigtness);
             break;
           }
 
@@ -627,20 +711,20 @@ void displayMenuView() {
   }
 
   if (menuIdx == 0) {
-    // РѕС‡РёСЃС‚РёС‚СЊ СЌРєСЂР°РЅ РїСЂРё РІС‹С…РѕРґРµ СЃРѕ СЃС‚СЂР°РЅРёС†С‹
+    // очистить экран при выходе со страницы
     display.clearDisplay();
     return;
   }
 
   // --------------
-  // РњРµРЅСЋ - РІС‹РІРѕРґ С‚РµРєСЃС‚РѕРІ
+  // Меню - вывод текстов
   display.setFont(fontRus6x8);
 
   if (menuSavedMarkTimer > 0) {
-    // РІС‹РІРѕРґ РІ 1 СЃС‚СЂРѕРєРµ РјРµС‚РєРё "СЃРѕС…СЂР°РЅРµРЅРѕ"
+    // вывод в 1 строке метки "сохранено"
     display.invertText(true);
-    char text[] = "СЃРѕС…СЂР°РЅРµРЅРѕ";
-    byte x = DISPLAY_W - 9 * display.getFontWidth() - 2 * 2;
+    char text[] = "сохранено";
+    byte x = display.getWidth() - 9 * display.getFontWidth() - 2 * 2;
     display.drawRect(x - 2, 0, x + 2 + display.getFontWidth() * 9, 10, true, 1);
     display.print(text, x, 1);
     display.invertText(false);
@@ -649,27 +733,30 @@ void displayMenuView() {
   // ---
   display.setCursor(0, 0);
   display.invertText(false);
-  display.print(F("РњР•РќР®"));
+  display.print(TextMenu);
   if (exitMenuTimer > 0 && exitMenuTimer < 5 * 1000) {
-    display.print(F("    РІС‹С…РѕРґ С‡РµСЂРµР· "));
+    display.setCursor(display.getWidth() - (strlen(TextMenuExitAfter) + 3) *
+                                               display.getFontWidth(),
+                      0);
+    display.print(TextMenuExitAfter);
     display.print(exitMenuTimer / 1000);
   }
 
   // --------------------
-  // РњРµРЅСЋ - РІС‹РІРѕРґ Р·РЅР°С‡РµРЅРёР№ РЅР°СЃС‚СЂРѕРµРє
+  // Меню - вывод значений настроек
   byte valuesX = 98;
 
-  // Р’С‹РІРѕРґ СЌР»РµРјРµРЅС‚РѕРІ РјРµРЅСЋ
+  // Вывод элементов меню
   if (0 < menuIdx && menuIdx <= MENU_ITEMS) {
     drawMenuItem(&menu[menuIdx - 1],
                  menuItemPassValueForSameIdx(menuItemState, menuIdx),
                  menuItemPassValueForSameIdx(menuItemSignal, menuIdx));
   }
 
-  // Р’С‹РІРѕРґ С‚РµРєСѓС‰РµР№ РїРѕР·РёС†РёРё РјРµРЅСЋ
+  // Вывод текущей позиции меню
   byte menuItems = 4;
-  byte menuPagerItemWidth = DISPLAY_W / menuItems;
-  for (byte i = 0; i < DISPLAY_W; i += 2) {
+  byte menuPagerItemWidth = display.getWidth() / menuItems;
+  for (byte i = 0; i < display.getWidth(); i += 2) {
     display.drawPixel(i, 14, WHITE);
   }
 
@@ -693,22 +780,18 @@ void drawMenuItem(MenuItem *item, byte state, byte signal) {
   display.setFont(fontRus12x10);
 
   for (byte i = 0; i < 3; i++) {
-    char *t = item->getTitle(i);
+    String t = item->getTitle(i);
     display.print(t, 0, 15 * i + 15);
   }
 
   if (state == MENU_ITEM_STATE_EDIT) {
     if (signal == MENU_ITEM_SIGNAL_INC) {
-      uint8_t v = item->getValue();
-      if (item->validate(v + 1)) {
-        item->incValue();
-      }
+      debugln(F("inc menu item value"));
+      item->incValue();
     }
     if (signal == MENU_ITEM_SIGNAL_DEC) {
-      uint8_t v = item->getValue();
-      if (item->validate(v - 1)) {
-        item->decValue();
-      }
+      debugln(F("dec menu item value"));
+      item->decValue();
     }
   }
 
@@ -726,41 +809,23 @@ void drawMenuItem(MenuItem *item, byte state, byte signal) {
   byte totalDigits = maxValueDigits + strlen(item->getSuffix());
 
   if (state == MENU_ITEM_STATE_EDIT) {
-    // Р—РЅР°С‡РµРЅРёРµ РІС‹Р±СЂР°РЅРѕ РґР»СЏ РёР·РјРµРЅРµРЅРёСЏ - РёРЅРІРµСЂС‚РёСЂРѕРІР°С‚СЊ Рё РїРѕРґСЃРІРµС‚РёС‚СЊ С‚РµРєСЃС‚
+    // Значение выбрано для изменения - инвертировать и подсветить текст
     display.invertText(true);
-    display.setCursor(DISPLAY_W - display.getFontWidth() * totalDigits - 6, 48);
+    display.setCursor(
+        display.getWidth() - display.getFontWidth() * totalDigits - 6, 48);
   }
 
-  display.setCursor(DISPLAY_W - (display.getFontWidth() * totalDigits) - 2, 48);
+  display.setCursor(
+      display.getWidth() - (display.getFontWidth() * totalDigits) - 2, 48);
   display.print(displayVal);
   display.print(item->getSuffix());
 }
 
-// Р РёСЃСѓРµС‚ Р·Р°Р»РёС‚С‹Р№ РїСЂСЏРјРѕСѓРіРѕР»СЊРЅРёРє.
+// Экран интро (отображается один раз при запуске устройства).
 //
-// X, Y, РљРѕР»-РІРѕ Р·РЅР°РєРѕРІ.
-void drawMenuValueFocus(byte x, byte y, byte digits) {
-  display.drawRect(x - 2, y - 1, x + digits * display.getFontWidth() + 2,
-                   y + display.getFontHeight() + 1, true, 1);
-}
-
-// Р—РЅР°С‡РµРЅРёРµ Р·Р°РґРµСЂР¶РєРё РІРєР»СЋС‡РµРЅРёСЏ РІ СЃРµРєСѓРЅРґР°С….
-//
-// РўР°Рє РєР°Рє Р·РЅР°С‡РµРЅРёРµ С…СЂР°РЅРёС‚СЃСЏ РІ eeprom РІ РІРёРґРµ byte (0-255), С‚Рѕ РёСЃРїРѕР»СЊР·СѓРµС‚СЃСЏ
-// РєРѕСЌС„С„РёС†РёРµРЅС‚.
-uint16_t getDelayBeforeFanForDisplay() {
-  return cfgDelayBeforeFanOn * (uint8_t)delayBeforeFanOnSecondsMult;
-}
-
-uint16_t getFanWorkTimeForDisplay() { return cfgFanWorkTimeMinutes; }
-
-uint16_t getFanOnSensorLevelForDisplay() { return cfgFanOnSensorLevel; }
-
-// Р­РєСЂР°РЅ РёРЅС‚СЂРѕ (РѕС‚РѕР±СЂР°Р¶Р°РµС‚СЃСЏ РѕРґРёРЅ СЂР°Р· РїСЂРё Р·Р°РїСѓСЃРєРµ СѓСЃС‚СЂРѕР№СЃС‚РІР°).
-//
-// Р’С‹РІРѕРґРёС‚СЃСЏ РЅР°Р·РІР°РЅРёРµ СѓСЃС‚СЂРѕР№СЃС‚РІР°, РІРµСЂСЃРёСЏ РїСЂРѕС€РёРІРєРё, web-СЃСЃС‹Р»РєР° РЅР° РїСЂРѕРµРєС‚.
+// Выводится название устройства, версия прошивки, web-ссылка на проект.
 void displayIntroPage() {
-  // debugln(F("DISPLAY intro view"));
+  debugln(F("DISPLAY intro view"));
 
   static bool isCleared = false;
 
@@ -771,29 +836,39 @@ void displayIntroPage() {
     delay(300);
     display.invertDisplay(false);
 
-    display.setFont(fontRus6x8);
-    display.print(F("РІРµСЂСЃРёСЏ: "), 0, 0);
-    display.print(VER_MAJOR);
-    display.print(F("."));
-    display.print(VER_MINOR);
-    if (VER_PATCH != "") {
-      display.print(F("-"));
-      display.print(VER_PATCH);
-    }
+    // debugln(F("A"));
+    // // Вывод версии прошивки
+    // display.setFont(fontRus6x8);
+    // display.print(TextVersion, 0, 0);
+    // display.print(TextSpace);
+    // display.print(VER_MAJOR);
+    // display.print(TextVersionDot);
+    // display.print(VER_MINOR);
+    // if (VER_PATCH != "") {
+    //   display.print(TextVersionMinus);
+    //   display.print(VER_PATCH);
+    // }
 
+    debugln(F("B"));
+    delay(100);
+    // Вывод названия продукта
     display.setFont(fontRus12x10);
-    display.print(F("Р’РµРЅС‚РёР»СЏС†РёСЏ"), 0, 16);
+    // display.print(TextVentilation, 0, 16);
+    display.print("Ventilation", 0, 16);
 
-    display.setFont(fontRus6x8);
-    display.printWrapping(String(GITHUB_URL), 0, 36, false);
+    // Вывод ссылки на github
+    // display.setFont(font6x8);
+    // display.printWrapping(String(GITHUB_URL), 0, 36, false);
 
     isCleared = true;
   }
 
+  debugln(F("C"));
+
   display.setFont(fontRus6x8);
-  display.setCursor(DISPLAY_W - display.getFontWidth() * 2, 0);
+  display.setCursor(display.getWidth() - display.getFontWidth() * 2, 0);
   if (introTimer / 1000 < 10) {
-    display.print(F(" "));
+    display.print(TextSpace);
   }
   display.print(introTimer / 1000);
 
@@ -803,7 +878,7 @@ void displayIntroPage() {
     if (keypad.event.type == KM_KEYDOWN) {
       switch (keypad.event.c) {
       case 'd': // ok
-                // Р±С‹СЃС‚СЂРѕ СѓР№С‚Рё СЃРѕ СЃС‚СЂР°РЅРёС†С‹ РёРЅС‚СЂРѕ
+                // быстро уйти со страницы интро
         display.clearDisplay();
         introTimer = 0;
         return;
@@ -812,7 +887,7 @@ void displayIntroPage() {
   }
 }
 
-// Р­РєСЂР°РЅ screensaver-Р°.
+// Экран screensaver-а.
 void displayScreenSaverView() {
   // debugln(F("DISPLAY screensaver view"));
 
@@ -836,22 +911,39 @@ void displayScreenSaverView() {
   display.setFont(fontRus6x8);
   uint8_t y = screensaverY;
   if (y >= 100) {
-    y = DISPLAY_H - 8 - (screensaverY - 100) - 16;
+    y = display.getHeigth() - 8 - (screensaverY - 100) - 16;
   }
-  display.print(F("Р Р•Р–РРњ РЎРќРђ Р­РљР РђРќРђ"), 17, y + 16);
+  display.print(TextSceensaver, display.getWidth() - strlen(TextSceensaver) / 2,
+                y + 16);
 
   display.update();
 
   screensaverY += 1;
   if (screensaverY < 100) {
-    if (screensaverY + 8 > DISPLAY_H - 16) {
+    if (screensaverY + 8 > display.getHeigth() - 16) {
       screensaverY = 100;
     }
   }
-  if (screensaverY > 100 + (DISPLAY_H - 16) - 8) {
+  if (screensaverY > 100 + (display.getHeigth() - 16) - 8) {
     screensaverY = 0;
   }
 }
+
+// Значение задержки включения в секундах.
+//
+// Так как значение хранится в eeprom в виде byte (0-255), то используется
+// коэффициент.
+uint16_t getDelayBeforeFanForDisplay() {
+  return cfgDelayBeforeFanOn * (uint8_t)delayBeforeFanOnSecondsMult;
+}
+
+uint16_t getFanWorkTimeForDisplay() { return cfgFanWorkDurationMinutes; }
+
+uint16_t getFanOnSensorLevelForDisplay() { return cfgFanOnSensorLevel; }
+
+uint16_t getDisplayBrigtnessForDisplay() { return cfgDisplayBrigtness; }
+
+void setDisplayBrigtness(uint8_t v) { display.setBrigtness(v); }
 
 void updateUptime() {
   if (millis() >= 3000000000) {
@@ -877,26 +969,26 @@ void updateUptime() {
 String uptimeForDisplay() {
   String r = "";
 
-  r += utDay;
-  r += F("Рґ ");
+  r.concat(utDay);
+  r.concat(F("д "));
 
   if (utHour < 10) {
-    r += F("0");
+    r.concat(F("0"));
   }
-  r += utHour;
-  r += F("С‡ ");
+  r.concat(utHour);
+  r.concat(F("ч "));
 
   if (utMinute < 10) {
-    r += F("0");
+    r.concat(F("0"));
   }
-  r += utMinute;
-  r += F("Рј ");
+  r.concat(utMinute);
+  r.concat(F("м "));
 
   if (utSecond < 10) {
-    r += F("0");
+    r.concat(F("0"));
   }
-  r += utSecond;
-  r += F("СЃ");
+  r.concat(utSecond);
+  r.concat(F("с "));
 
   return r;
 }
