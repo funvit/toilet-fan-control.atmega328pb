@@ -1,5 +1,6 @@
 /*
-  Keep this file in win-1251 encoding!
+  Keep this file in win-1251 encoding! In UTF-8 strlen is broken for russian
+  strings...
 */
 
 #include "./menu_item.h"
@@ -72,7 +73,7 @@ KeyMatrix keypad((char *)keymap, (byte)2, (byte)2, rowPins, colPins);
 // Глобальные переменные
 //------------------------
 
-// Меню
+// Переменные меню
 #define MENU_ITEMS 4
 byte menuIdx = 0;
 #define MENU_ITEM_STATE_SELECTED 1
@@ -82,29 +83,25 @@ byte menuItemState = MENU_ITEM_STATE_SELECTED;
 #define MENU_ITEM_SIGNAL_DEC 2
 #define MENU_ITEM_SIGNAL_SAVE 3
 
+// Элементы меню
 const char *Menu1[3] = {"Пауза до", "включения", ""};
+const uint8_t MENU1_VAL_MIN = 0;
+const uint8_t MENU1_VAL_MAX = 30;
+
 const char *Menu2[3] = {"Длительно-", "сть работы", "вент."};
+const uint8_t MENU2_VAL_MIN = 1;
+const uint8_t MENU2_VAL_MAX = 15;
+
 const char *Menu3[3] = {"Порог", "датчика", "света"};
+const uint8_t MENU3_VAL_MIN = 1;
+const uint8_t MENU3_VAL_MAX = 99;
+
 const char *Menu4[3] = {"Яркость", "экрана", ""};
+const uint8_t MENU4_VAL_MIN = 0;
+const uint8_t MENU4_VAL_MAX = 255;
 
 // Тексты
-const char *TextSpace = " ";
-const char *TextDelimiter = "/";
-const char *TextMainScreenDelayMode = "ПАУЗА";
-const char *TextMainScreenWaitMode = "ОЖИДАНИЕ";
-const char *TextMinuteBig = "М.";
-const char *TextMinuteSmall = "м.";
-const char *TextSecondBig = "C.";
-const char *TextSecondSmall = "c.";
-const char *TextPercentSmall = "%";
-const char *TextMenu = "МЕНЮ";
-const char *TextMenuExitAfter = "выход через";
-const char *TextVersion = "версия:";
-const char *TextVersionDot = ".";
-const char *TextVersionMinus = "-";
-const char *TextVentilation = "Вентиляция";
-const char *TextSceensaver = "РЕЖИМ СНА ЭКРАНА";
-const char *TextLight = "СВЕТ:";
+const char TextSceensaver[] PROGMEM = "РЕЖИМ СНА ЭКРАНА";
 
 // screen saver
 bool screensaverTimerInited = false;
@@ -217,18 +214,19 @@ void setup() {
   // считывание настроек из eeprom
   debugln(F("SETUP loading params from eeprom"));
 
-  uint8_t v = eepromGetDelayBeforeFanOnValue();
-  // FIXME: fix validator somehow
-  // if (isDelayBeforeFanOnValueValid(v)) {
-  // debugln(F("EEPROM: delay before fan loaded"));
-  cfgDelayBeforeFanOn = v;
-  // } else {
-  //   // невалидное значение в eeprom - переписать дефолтным
-  //   eepromSaveDelayBeforeFanOnValue(cfgDelayBeforeFanOn);
-  // }
+  uint8_t v;
+
+  v = eepromGetDelayBeforeFanOnValue();
+  if (MENU1_VAL_MIN <= v && v <= MENU1_VAL_MAX) {
+    // debugln(F("EEPROM: delay before fan loaded"));
+    cfgDelayBeforeFanOn = v;
+  } else {
+    // невалидное значение в eeprom - переписать дефолтным
+    eepromSaveDelayBeforeFanOnValue(cfgDelayBeforeFanOn);
+  }
 
   v = eepromGetFanWorkDurationValue();
-  if (isFanWorkDurationValueValid(v)) {
+  if (MENU2_VAL_MIN <= v && v <= MENU2_VAL_MAX) {
     // debugln(F("EEPROM: fan work duration loaded"));
     cfgFanWorkDurationMinutes = v;
   } else {
@@ -237,7 +235,7 @@ void setup() {
   }
 
   v = eepromGetFanOnSensorValue();
-  if (isFanOnSensorLevelValueValid(v)) {
+  if (MENU3_VAL_MIN <= v && v <= MENU3_VAL_MAX) {
     // debugln(F("EEPROM: sensor level loaded"));
     cfgFanOnSensorLevel = v;
   } else {
@@ -246,8 +244,7 @@ void setup() {
   }
 
   v = eepromGetDisplayBrigtnessValue();
-  if (isDisplayBrigtnessValueValid(v)) {
-    delay(100);
+  if (MENU4_VAL_MIN <= v && v <= MENU4_VAL_MAX) {
     cfgDisplayBrigtness = v;
     display.setBrigtness(v);
   } else {
@@ -261,21 +258,21 @@ void setup() {
   debugln(F("Init menu"));
   delay(100);
 
-  MenuItem m1 = MenuItem(Menu1, TextSecondSmall, 0, 30, 1);
+  MenuItem m1 = MenuItem(Menu1, "с.", 0, 30, 1);
   m1.setValue(cfgDelayBeforeFanOn);
   m1.setUpdateOnValueChange(&cfgDelayBeforeFanOn);
   m1.setDisplayer(&getDelayBeforeFanForDisplay);
   menu[0] = m1;
   // debugln(F("Init menu: item 1 ok"));
 
-  MenuItem m2 = MenuItem(Menu2, TextMinuteSmall, 1, 15, 1);
+  MenuItem m2 = MenuItem(Menu2, "м.", 1, 15, 1);
   m2.setValue(cfgFanWorkDurationMinutes);
   m2.setUpdateOnValueChange(&cfgFanWorkDurationMinutes);
   m2.setDisplayer(&getFanWorkTimeForDisplay);
   menu[1] = m2;
   // debugln(F("Init menu: item 2 ok"));
 
-  MenuItem m3 = MenuItem(Menu3, TextPercentSmall, 1, 99, 1);
+  MenuItem m3 = MenuItem(Menu3, "%", 1, 99, 1);
   m3.setValue(cfgFanOnSensorLevel);
   m3.setUpdateOnValueChange(&cfgFanOnSensorLevel);
   m3.setDisplayer(&getFanOnSensorLevelForDisplay);
@@ -435,8 +432,12 @@ uint16_t getStrWidthForDisplay(const char *str) {
   return strlen(str) * display.getFontWidth();
 }
 
-uint16_t getStrWidthForDisplay(String str) {
-  return str.length() * display.getFontWidth();
+uint16_t getStrWidthForDisplay(String *str) {
+  return str->length() * display.getFontWidth();
+}
+
+uint16_t getStrWidthForDisplay(const String *str) {
+  return str->length() * display.getFontWidth();
 }
 
 uint16_t getXForDisplayTextCentered(char *str) {
@@ -448,6 +449,22 @@ uint16_t getXForDisplayTextCentered(char *str) {
 }
 
 uint16_t getXForDisplayTextCentered(const char *str) {
+  uint16_t c = getStrWidthForDisplay(str);
+  if (c > display.getWidth()) {
+    return 0;
+  }
+  return (display.getWidth() - c) / 2;
+}
+
+uint16_t getXForDisplayTextCentered(String *str) {
+  uint16_t c = getStrWidthForDisplay(str);
+  if (c > display.getWidth()) {
+    return 0;
+  }
+  return (display.getWidth() - c) / 2;
+}
+
+uint16_t getXForDisplayTextCentered(const String *str) {
   uint16_t c = getStrWidthForDisplay(str);
   if (c > display.getWidth()) {
     return 0;
@@ -544,62 +561,60 @@ void displayMainView() {
 
   display.setFont(fontRus6x8);
   // информация от сенсора
-  display.print(TextLight, 6 * 11 + 2, 3);
+  display.print(F("СВЕТ:"), 6 * 11 + 2, 3);
 
   display.setCursor(6 * 16 + 2, 3);
   if (gLight <= 9) {
-    display.print(TextSpace);
+    display.print(F(" "));
   }
 
   // вывод значений
   display.print(gLight);
-  display.print(TextDelimiter);
-  // byte cfgFanOnSensorLevel = eepromGetFanOnSensorValue();
+  display.print(F("/"));
   if (cfgFanOnSensorLevel <= 9) {
-    display.print(TextSpace);
+    display.print(F(" "));
   }
   display.print(cfgFanOnSensorLevel);
 
   // вывод состояния на основную чать дисплея
   if (fanWorkTimer > 0) {
+    display.setFont(fontRus12x10);
+    display.print(F("ВКЛЮЧЁН"), 0, 24);
+
     // вытяжка включена - вывод таймера до отключения
     display.setFont(mediumNumbers);
-    byte x = 80;
-    if (fanWorkTimer / 1000 < 100) {
-      x += display.getFontWidth();
-    }
-    if (fanWorkTimer / 1000 < 10) {
-      x += display.getFontWidth();
-    }
-    display.print(fanWorkTimer / 1000, x, 21);
-    byte fw = display.getFontWidth();
-    display.setFont(fontRus6x8);
-    display.print(TextSecondBig, 80 + 3 * fw, 30);
+    byte v = fanWorkTimer / 1000;
+    byte x = display.getWidth() - countDigits(v) * display.getFontWidth();
+    display.print(fanWorkTimer / 1000, x, 24);
+
   } else {
     if (beforeFanOnTimer > 0) {
       // вывод таймера задержки перед включением
       display.setFont(fontRus12x10);
-      display.print(TextMainScreenDelayMode, 0, 24);
+      display.print(F("ПАУЗА"), 0, 24);
       uint16_t v = beforeFanOnTimer / 1000;
+      display.setFont(mediumNumbers);
       display.print(
-          beforeFanOnTimer / 1000,
-          display.getWidth() - countDigits(v) * display.getFontWidth(), 24);
+          v, display.getWidth() - countDigits(v) * display.getFontWidth(), 24);
     } else {
       display.setFont(fontRus12x10);
       // вытяжка выключена - состояние ожидания
+      String TextMainScreenWaitMode = F("ОЖИДАНИЕ");
       display.print(TextMainScreenWaitMode,
-                    getXForDisplayTextCentered(TextMainScreenWaitMode), 24);
+                    getXForDisplayTextCentered(&TextMainScreenWaitMode), 24);
     }
   }
 
-  // uptime
+  // Вывод uptime
   display.setFont(fontRus6x8);
+  display.invertText(false);
   String uptime = uptimeForDisplay();
-  display.setCursor(display.getWidth() - getStrWidthForDisplay(uptime) -
+  display.setCursor(display.getWidth() - getStrWidthForDisplay(&uptime) -
                         (30 - utSecond / 2),
                     display.getHeigth() - display.getFontHeight());
   display.print(uptime);
 
+  // Обновить экран
   display.update();
 
   // Кнопки
@@ -736,13 +751,17 @@ void displayMenuView() {
   // ---
   display.setCursor(0, 0);
   display.invertText(false);
-  display.print(TextMenu);
+  display.print(F("МЕНЮ"));
   if (exitMenuTimer > 0 && exitMenuTimer < 5 * 1000) {
-    display.setCursor(display.getWidth() - (strlen(TextMenuExitAfter) + 3) *
-                                               display.getFontWidth(),
-                      0);
+    const String TextMenuExitAfter = F("выход через");
+    uint16_t v = exitMenuTimer / 1000;
+    uint16_t x = display.getWidth();
+    x -= getStrWidthForDisplay(&TextMenuExitAfter);
+    x -= (countDigits(v) + 1) * display.getFontWidth();
+    display.setCursor(x, 0);
     display.print(TextMenuExitAfter);
-    display.print(exitMenuTimer / 1000);
+    display.print(F(" "));
+    display.print(v);
   }
 
   // --------------------
@@ -760,12 +779,14 @@ void displayMenuView() {
   byte menuItems = 4;
   byte menuPagerItemWidth = display.getWidth() / menuItems;
   for (byte i = 0; i < display.getWidth(); i += 2) {
+    // Точки
     display.drawPixel(i, 14, WHITE);
   }
 
   for (byte i = 0; i < 3; i++) {
-    display.drawLine(menuPagerItemWidth * (menuIdx - 1) + 2, 13 + i,
-                     menuPagerItemWidth * (menuIdx)-2, 13 + i, WHITE);
+    // Толстый прямоугольник
+    display.drawLine(menuPagerItemWidth * (menuIdx - 1), 13 + i,
+                     menuPagerItemWidth * (menuIdx), 13 + i, WHITE);
   }
 
   display.update();
@@ -841,23 +862,22 @@ void displayIntroPage() {
 
     // debugln(F("A"));
     // // Вывод версии прошивки
-    // display.setFont(fontRus6x8);
-    // display.print(TextVersion, 0, 0);
-    // display.print(TextSpace);
-    // display.print(VER_MAJOR);
-    // display.print(TextVersionDot);
-    // display.print(VER_MINOR);
-    // if (VER_PATCH != "") {
-    //   display.print(TextVersionMinus);
-    //   display.print(VER_PATCH);
-    // }
+    display.setFont(fontRus6x8);
+    display.print(F("версия:"), 0, 0);
+    display.print(F(" "));
+    display.print(VER_MAJOR);
+    display.print(F("."));
+    display.print(VER_MINOR);
+    if (VER_PATCH != "") {
+      display.print(F("-"));
+      display.print(VER_PATCH);
+    }
 
     debugln(F("B"));
     delay(100);
     // Вывод названия продукта
     display.setFont(fontRus12x10);
-    // display.print(TextVentilation, 0, 16);
-    display.print("Ventilation", 0, 16);
+    display.print(F("Вентиляция"), 0, 16);
 
     // Вывод ссылки на github
     // display.setFont(font6x8);
@@ -871,7 +891,7 @@ void displayIntroPage() {
   display.setFont(fontRus6x8);
   display.setCursor(display.getWidth() - display.getFontWidth() * 2, 0);
   if (introTimer / 1000 < 10) {
-    display.print(TextSpace);
+    display.print(F(" "));
   }
   display.print(introTimer / 1000);
 
@@ -970,28 +990,28 @@ void updateUptime() {
 }
 
 String uptimeForDisplay() {
-  String r = "";
+  String r;
 
-  r.concat(utDay);
-  r.concat(F("д "));
+  r += utDay;
+  r += F("д ");
 
   if (utHour < 10) {
-    r.concat(F("0"));
+    r += F("0");
   }
-  r.concat(utHour);
-  r.concat(F("ч "));
+  r += utHour;
+  r += F("ч ");
 
   if (utMinute < 10) {
-    r.concat(F("0"));
+    r += F("0");
   }
-  r.concat(utMinute);
-  r.concat(F("м "));
+  r += utMinute;
+  r += F("м ");
 
   if (utSecond < 10) {
-    r.concat(F("0"));
+    r += F("0");
   }
-  r.concat(utSecond);
-  r.concat(F("с "));
+  r += utSecond;
+  r += F("с");
 
   return r;
 }
