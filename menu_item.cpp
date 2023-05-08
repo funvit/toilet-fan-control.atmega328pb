@@ -1,6 +1,7 @@
 #include "menu_item.h"
 
-MenuItem::MenuItem() {}
+MenuItem::MenuItem() {
+}
 
 MenuItem::MenuItem(const char *str[3], const char *suffix) {
   MenuItem(str, suffix, 0, 255, 1);

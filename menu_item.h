@@ -20,9 +20,15 @@ public:
   MenuItem(const char *str[3], const char *suffix, uint8_t valueMin,
            uint8_t valueMax, uint8_t valueStep);
 
-  const char *getTitle(uint8_t idx) { return titles[idx]; }
-  const char *getSuffix() { return suffix; }
-  uint8_t getValue() { return value; }
+  const char *getTitle(uint8_t idx) {
+    return titles[idx];
+  }
+  const char *getSuffix() {
+    return suffix;
+  }
+  uint8_t getValue() {
+    return value;
+  }
 
   // Увеличить значение на величину шага.
   void incValue() {
@@ -72,12 +78,22 @@ public:
   }
   // Устанавливает внутреннее значение.
   // Callback-и не вызываются.
-  void setValue(uint8_t v) { value = v; }
-  void setDisplayer(uint16_t (*fn)()) { displayer = fn; }
+  void setValue(uint8_t v) {
+    value = v;
+  }
+  void setDisplayer(uint16_t (*fn)()) {
+    displayer = fn;
+  }
   // Указанная функция будет вызываться при изменении внутреннего значения.
-  void setOnValueChange(void (*fn)(uint8_t v)) { onValueChange = fn; }
+  void setOnValueChange(void (*fn)(uint8_t v)) {
+    onValueChange = fn;
+  }
   // Обновляет значение по указателю при изменении внутреннего значения.
-  void setUpdateOnValueChange(uint8_t *v) { updateOnChange = v; }
+  void setUpdateOnValueChange(uint8_t *v) {
+    updateOnChange = v;
+  }
   // Возвращает значение для отображения на экране.
-  uint16_t display() { return displayer(); }
+  uint16_t display() {
+    return displayer();
+  }
 };

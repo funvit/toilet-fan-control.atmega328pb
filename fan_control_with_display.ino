@@ -9,6 +9,7 @@
 #include "./storage.h"
 #include <WString.h>
 #include <Wire.h>
+#include <avr/pgmspace.h>
 #include <avr/wdt.h>
 
 // Иконка ветра
@@ -74,14 +75,15 @@ KeyMatrix keypad((char *)keymap, (byte)2, (byte)2, rowPins, colPins);
 //------------------------
 
 // Переменные меню
-#define MENU_ITEMS 4
-byte menuIdx = 0;
+#define MENU_ITEMS 5
 #define MENU_ITEM_STATE_SELECTED 1
 #define MENU_ITEM_STATE_EDIT 2
-byte menuItemState = MENU_ITEM_STATE_SELECTED;
 #define MENU_ITEM_SIGNAL_INC 1
 #define MENU_ITEM_SIGNAL_DEC 2
 #define MENU_ITEM_SIGNAL_SAVE 3
+
+byte menuIdx = 0;
+byte menuItemState = MENU_ITEM_STATE_SELECTED;
 
 // Элементы меню
 const char *Menu1[3] = {"Пауза до", "включения", ""};
@@ -100,8 +102,12 @@ const char *Menu4[3] = {"Яркость", "экрана", ""};
 const uint8_t MENU4_VAL_MIN = 0;
 const uint8_t MENU4_VAL_MAX = 255;
 
+const char *Menu5[3] = {"Защита эк-", "рана через", ""};
+const uint8_t MENU5_VAL_MIN = 0;
+const uint8_t MENU5_VAL_MAX = 255;
+
 // Тексты
-const char TextSceensaver[] PROGMEM = "РЕЖИМ СНА ЭКРАНА";
+#define TEXT_SCEENSAVER "РЕЖИМ СНА ЭКРАНА"
 
 // screen saver
 bool screensaverTimerInited = false;
@@ -135,6 +141,9 @@ byte cfgFanWorkDurationMinutes = 5; // значение по-умолчанию
 byte cfgFanOnSensorLevel = 40; // значение по-умолчанию
 // Яркость экрана
 byte cfgDisplayBrigtness = 4;
+// Кол-во секунд перед запуском screensaver-а.
+// 0 = disabled.
+byte cfgScreensaverDelay = 10;
 // /--------------------
 
 // uptime (support more than 50 days)
@@ -152,12 +161,6 @@ uint32_t introTimer = 10 * 1000;
 #define LG_TIMER 100
 uint32_t lgTimer = LG_TIMER;
 static uint64_t lg = 0;
-
-// Кол-во секунд перед запуском screensaver-а.
-// 0 = disabled.
-// FIXME: enable screensaver
-// #define SCREENSAVER 10 * 1000
-#define SCREENSAVER 0
 
 //------------------------
 // debug, debugln
@@ -208,7 +211,7 @@ void setup() {
   display.setCoding(TXT_WIN1251);
   // не обновлять автоматически. только при вызове update().
   display.autoUpdate(false);
-  display.setBrigtness(1); // default
+  display.setBrightness(cfgDisplayBrigtness);
 
   //-------------------------
   // считывание настроек из eeprom
@@ -243,19 +246,31 @@ void setup() {
     eepromSaveFanOnSensorValue(cfgFanOnSensorLevel);
   }
 
-  v = eepromGetDisplayBrigtnessValue();
+  v = eepromGetDisplayBrightnessValue();
   if (MENU4_VAL_MIN <= v && v <= MENU4_VAL_MAX) {
     cfgDisplayBrigtness = v;
-    display.setBrigtness(v);
+    display.setBrightness(v);
   } else {
     // невалидное значение в eeprom - переписать дефолтным
-    eepromSaveDisplayBrigtnessValue(cfgDisplayBrigtness);
+    eepromSaveDisplayBrightnessValue(cfgDisplayBrigtness);
+  }
+
+  v = eepromGetScreensaverOn();
+  if (MENU5_VAL_MIN <= v && v <= MENU5_VAL_MAX) {
+    cfgScreensaverDelay = v;
+    debug(F("eeprom: got screensaver delay: "));
+    debugln(v);
+    display.setBrightness(cfgDisplayBrigtness);
+  } else {
+    // невалидное значение в eeprom - переписать дефолтным
+    eepromSaveScreensaverOn(cfgScreensaverDelay);
   }
   // -------------------------
 
   // =========================
   // МЕНЮ
-  debugln(F("Init menu"));
+  debug(F("Init menu, items: "));
+  debugln(MENU_ITEMS);
   delay(100);
 
   MenuItem m1 = MenuItem(Menu1, "с.", 0, 30, 1);
@@ -263,21 +278,21 @@ void setup() {
   m1.setUpdateOnValueChange(&cfgDelayBeforeFanOn);
   m1.setDisplayer(&getDelayBeforeFanForDisplay);
   menu[0] = m1;
-  // debugln(F("Init menu: item 1 ok"));
+  debugln(F("Menu item 1 inited"));
 
   MenuItem m2 = MenuItem(Menu2, "м.", 1, 15, 1);
   m2.setValue(cfgFanWorkDurationMinutes);
   m2.setUpdateOnValueChange(&cfgFanWorkDurationMinutes);
   m2.setDisplayer(&getFanWorkTimeForDisplay);
   menu[1] = m2;
-  // debugln(F("Init menu: item 2 ok"));
+  debugln(F("Menu item 2 inited"));
 
   MenuItem m3 = MenuItem(Menu3, "%", 1, 99, 1);
   m3.setValue(cfgFanOnSensorLevel);
   m3.setUpdateOnValueChange(&cfgFanOnSensorLevel);
   m3.setDisplayer(&getFanOnSensorLevelForDisplay);
   menu[2] = m3;
-  // debugln(F("Init menu: item 3 ok"));
+  debugln(F("Menu item 3 inited"));
 
   MenuItem m4 = MenuItem(Menu4, 0, 0, 255, 15);
   m4.setValue(cfgDisplayBrigtness);
@@ -285,7 +300,15 @@ void setup() {
   m4.setDisplayer(&getDisplayBrigtnessForDisplay);
   m4.setOnValueChange(&setDisplayBrigtness);
   menu[3] = m4;
-  // debugln(F("Init menu: item 4 ok"));
+  debugln(F("Menu item 4 inited"));
+
+  MenuItem m5 = MenuItem(Menu5, "c.", 0, 255, 5);
+  m5.setValue(cfgScreensaverDelay);
+  m5.setUpdateOnValueChange(&cfgScreensaverDelay);
+  m5.setDisplayer(&getScreensaverDelayForDisplay);
+  menu[4] = m5;
+  debugln(F("Menu item 5 inited"));
+
   // /===================
 
   debugln(F("SETUP done"));
@@ -305,6 +328,7 @@ void loop() {
 
   // Выбор страницы для отображения на дисплее
   if (introTimer > 0) {
+    display.setBrightness(cfgScreensaverDelay);
     displayIntroPage();
   } else {
     if (menuIdx == 0) {
@@ -312,19 +336,21 @@ void loop() {
 
       if (screensaver) {
         screensaverTimerInited = false;
+        display.setBrightness(0);
         displayScreenSaverView();
       } else {
-        if (!screensaverTimerInited && SCREENSAVER != 0) {
-          screensaverTimer = SCREENSAVER;
+        if (!screensaverTimerInited && cfgScreensaverDelay != 0) {
+          screensaverTimer = cfgScreensaverDelay * 1000;
           screensaverTimerInited = true;
         }
 
+        // display.setBrightness(cfgScreensaverDelay);
         displayMainView();
       }
     } else {
       // Отобразить экран меню.
-      screensaver = false;
-      screensaverTimerInited = false;
+      resetScreensaver();
+      // display.setBrightness(cfgScreensaverDelay);
       displayMenuView();
     }
   }
@@ -360,8 +386,10 @@ void loop() {
     menuItemState = MENU_ITEM_STATE_SELECTED;
   }
 
-  if (!screensaver && isTimerOut(&screensaverTimer, delta)) {
+  if (cfgScreensaverDelay > 0 && !screensaver && screensaverTimerInited &&
+      isTimerOut(&screensaverTimer, delta)) {
     screensaver = true;
+    debugln(F("activating screensaver"));
   }
 
   // реагирование на превышение порога сенсора
@@ -621,6 +649,8 @@ void displayMainView() {
   if (keypad.pollEvent()) {
     // есть событие, обрабатываем
     if (keypad.event.type == KM_KEYDOWN) {
+      resetScreensaver();
+
       switch (keypad.event.c) {
       case 'a':
         // нажата кнопка "меню"
@@ -702,18 +732,32 @@ void displayMenuView() {
 
           menuItemSignal = MENU_ITEM_SIGNAL_SAVE;
 
+          // TODO: move to menu?
           switch (menuIdx) {
           case 1:
+            debug(F("eeprom: save before fan on delay: "));
+            debugln(cfgDelayBeforeFanOn);
             eepromSaveDelayBeforeFanOnValue(cfgDelayBeforeFanOn);
             break;
           case 2:
+            debug(F("eeprom: save fan work duration: "));
+            debugln(cfgFanWorkDurationMinutes);
             eepromSaveFanWorkDurationValue(cfgFanWorkDurationMinutes);
             break;
           case 3:
+            debug(F("eeprom: save fan on sensor level: "));
+            debugln(cfgFanOnSensorLevel);
             eepromSaveFanOnSensorValue(cfgFanOnSensorLevel);
             break;
           case 4:
-            eepromSaveDisplayBrigtnessValue(cfgDisplayBrigtness);
+            debug(F("eeprom: save display brightness: "));
+            debugln(cfgDisplayBrigtness);
+            eepromSaveDisplayBrightnessValue(cfgDisplayBrigtness);
+            break;
+          case 5:
+            debug(F("eeprom: save screensaver delay: "));
+            debugln(cfgScreensaverDelay);
+            eepromSaveScreensaverOn(cfgScreensaverDelay);
             break;
           }
 
@@ -776,14 +820,13 @@ void displayMenuView() {
   }
 
   // Вывод текущей позиции меню
-  byte menuItems = 4;
-  byte menuPagerItemWidth = display.getWidth() / menuItems;
+  byte menuPagerItemWidth = display.getWidth() / MENU_ITEMS;
   for (byte i = 0; i < display.getWidth(); i += 2) {
     // Точки
     display.drawPixel(i, 14, WHITE);
   }
 
-  for (byte i = 0; i < 3; i++) {
+  for (byte i = 0; i < 3 - 1; i++) {
     // Толстый прямоугольник
     display.drawLine(menuPagerItemWidth * (menuIdx - 1), 13 + i,
                      menuPagerItemWidth * (menuIdx), 13 + i, WHITE);
@@ -860,8 +903,7 @@ void displayIntroPage() {
     delay(300);
     display.invertDisplay(false);
 
-    // debugln(F("A"));
-    // // Вывод версии прошивки
+    // Вывод версии прошивки
     display.setFont(fontRus6x8);
     display.print(F("версия:"), 0, 0);
     display.print(F(" "));
@@ -873,20 +915,16 @@ void displayIntroPage() {
       display.print(VER_PATCH);
     }
 
-    debugln(F("B"));
-    delay(100);
     // Вывод названия продукта
     display.setFont(fontRus12x10);
     display.print(F("Вентиляция"), 0, 16);
 
     // Вывод ссылки на github
-    // display.setFont(font6x8);
-    // display.printWrapping(String(GITHUB_URL), 0, 36, false);
+    display.setFont(font6x8);
+    display.printWrapping(F(GITHUB_URL), 0, 36, false);
 
     isCleared = true;
   }
-
-  debugln(F("C"));
 
   display.setFont(fontRus6x8);
   display.setCursor(display.getWidth() - display.getFontWidth() * 2, 0);
@@ -912,11 +950,10 @@ void displayIntroPage() {
 
 // Экран screensaver-а.
 void displayScreenSaverView() {
-  // debugln(F("DISPLAY screensaver view"));
+  debugln(F("DISPLAY screensaver view"));
 
   if (keypad.pollEvent()) {
-    screensaver = false;
-    screensaverTimerInited = false;
+    resetScreensaver();
     return;
   }
 
@@ -936,8 +973,8 @@ void displayScreenSaverView() {
   if (y >= 100) {
     y = display.getHeigth() - 8 - (screensaverY - 100) - 16;
   }
-  display.print(TextSceensaver, display.getWidth() - strlen(TextSceensaver) / 2,
-                y + 16);
+  const String t = F(TEXT_SCEENSAVER);
+  display.print(t, getXForDisplayTextCentered(&t), y + 16);
 
   display.update();
 
@@ -960,13 +997,31 @@ uint16_t getDelayBeforeFanForDisplay() {
   return cfgDelayBeforeFanOn * (uint8_t)delayBeforeFanOnSecondsMult;
 }
 
-uint16_t getFanWorkTimeForDisplay() { return cfgFanWorkDurationMinutes; }
+uint16_t getFanWorkTimeForDisplay() {
+  return cfgFanWorkDurationMinutes;
+}
 
-uint16_t getFanOnSensorLevelForDisplay() { return cfgFanOnSensorLevel; }
+uint16_t getFanOnSensorLevelForDisplay() {
+  return cfgFanOnSensorLevel;
+}
 
-uint16_t getDisplayBrigtnessForDisplay() { return cfgDisplayBrigtness; }
+uint16_t getDisplayBrigtnessForDisplay() {
+  return cfgDisplayBrigtness;
+}
 
-void setDisplayBrigtness(uint8_t v) { display.setBrigtness(v); }
+uint16_t getScreensaverDelayForDisplay() {
+  return cfgScreensaverDelay;
+}
+
+void setDisplayBrigtness(uint8_t v) {
+  display.setBrightness(v);
+}
+
+void resetScreensaver() {
+  screensaver = false;
+  screensaverTimerInited = false;
+  display.setBrightness(cfgDisplayBrigtness);
+}
 
 void updateUptime() {
   if (millis() >= 3000000000) {
