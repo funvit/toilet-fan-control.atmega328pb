@@ -405,6 +405,9 @@ void loop() {
 
   // таймер выхода из меню по бездействию
   if (isTimerOut(&exitMenuTimer, delta)) {
+    // reset menu item value
+    onMenuItemChangeAbort();
+
     menuIdx = NO_MENU_ITEM_SELECTED;
     menuItemState = MENU_ITEM_STATE_SELECTED;
   }
@@ -691,10 +694,7 @@ byte handleKeyboardEvents() {
           // Отменить изменение текущих настроек (считать текущие сохраненные
           // значения из eeprom)
           debugln(F("MENU: canceling edit value mode"));
-
-          currentDelayBeforeFanOn = eepromGetDelayBeforeFanOnValue();
-          currentFanWorkDurationMinutes = eepromGetFanWorkDurationValue();
-          currentFanOnSensorLevel = eepromGetFanOnSensorValue();
+          onMenuItemChangeAbort();
 
           menuItemState = MENU_ITEM_STATE_SELECTED;
         } else {
@@ -792,26 +792,7 @@ byte handleKeyboardEvents() {
 
           // Сбросить изменения в объекте menu (если ранее было изменение без
           // сохранения)
-          switch (menuIdx) {
-          case 0:
-            menu[0].setValue(currentDelayBeforeFanOn);
-            break;
-          case 1:
-            menu[1].setValue(currentFanWorkDurationMinutes);
-            break;
-          case 2:
-            menu[2].setValue(currentFanOnSensorLevel);
-            break;
-          case 3:
-            menu[3].setValue(currentDisplayBrigtness);
-            break;
-          case 4:
-            menu[4].setValue(currentScreensaverDelay);
-            break;
-          case 5:
-            // nop
-            break;
-          }
+          onMenuItemChangeAbort();
         }
       }
     }
@@ -847,6 +828,35 @@ byte handleKeyboardEvents() {
   }
 
   return menuItemSignal;
+}
+
+void onMenuItemChangeAbort() {
+
+  switch (menuIdx) {
+  case 0:
+    currentDelayBeforeFanOn = eepromGetDelayBeforeFanOnValue();
+    menu[0].setValue(currentDelayBeforeFanOn);
+    break;
+  case 1:
+    currentFanWorkDurationMinutes = eepromGetFanWorkDurationValue();
+    menu[1].setValue(currentFanWorkDurationMinutes);
+    break;
+  case 2:
+    currentFanOnSensorLevel = eepromGetFanOnSensorValue();
+    menu[2].setValue(currentFanOnSensorLevel);
+    break;
+  case 3:
+    currentDisplayBrigtness = eepromGetDisplayBrightnessValue();
+    menu[3].setValue(currentDisplayBrigtness);
+    break;
+  case 4:
+    currentScreensaverDelay = eepromGetScreensaverOn();
+    menu[4].setValue(currentScreensaverDelay);
+    break;
+  case 5:
+    // nop
+    break;
+  }
 }
 
 byte menuItemPassValueForSameIdx(byte val, byte idx) {
