@@ -3,6 +3,9 @@
   strings...
 */
 
+// Uncomment for serial debugging.
+// #define DEBUG
+
 #include "./menu_item.h"
 #include "./src/KeyMatrix/KeyMatrix.h"
 #include "./src/TroykaOLED/TroykaOLED.h"
@@ -174,8 +177,6 @@ static uint64_t lg = 0;
 //------------------------
 // debug, debugln
 //------------------------
-#define DEBUG
-
 #ifdef DEBUG
 #define debug(x) Serial.print(x)
 #define debugln(x) Serial.println(x);
@@ -196,6 +197,8 @@ byte currentPageDbg = 255;
       currentPageDbg = pageId;                                                 \
     }                                                                          \
   };
+#else
+#define debugView(name, pageId) ;
 #endif
 
 // ===========================================
