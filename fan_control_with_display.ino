@@ -78,7 +78,7 @@ KeyMatrix keypad((char *)keymap, (byte)2, (byte)2, rowPins, colPins);
 //------------------------
 
 // Переменные меню
-#define MENU_ITEMS 6
+#define MENU_ITEMS 7
 #define MENU_ITEM_STATE_SELECTED 1
 #define MENU_ITEM_STATE_EDIT 2
 #define MENU_ITEM_SIGNAL_INC 1
@@ -127,7 +127,7 @@ uint8_t screensaverY = 0;
 byte gLight = 0;
 uint32_t exitMenuTimer;
 uint32_t beforeFanOnTimer;
-uint32_t fanWorkTimer;
+uint32_t fanWorkTimer; // в миллисекундах
 
 bool isFanOnRepeat;
 
@@ -550,7 +550,7 @@ void displayMainView() {
 
     // вытяжка включена - вывод таймера до отключения
     display.setFont(mediumNumbers);
-    byte v = fanWorkTimer / 1000;
+    u16 v = fanWorkTimer / 1000; // ex: 5m * 60  = 300
     byte x = display.getWidth() - countDigits(v) * display.getFontWidth();
     display.print(fanWorkTimer / 1000, x, 24);
 
@@ -778,9 +778,6 @@ byte handleKeyboardEvents() {
             debugln(currentScreensaverDelay);
             eepromSaveScreensaverOn(currentScreensaverDelay);
             break;
-          case 5:
-            // nop
-            break;
           }
 
           menuSavedMarkTimer = 2 * 1000;
@@ -856,9 +853,6 @@ void onMenuItemChangeAbort() {
     currentScreensaverDelay = eepromGetScreensaverOn();
     menu[4].setValue(currentScreensaverDelay);
     break;
-  case 5:
-    // nop
-    break;
   }
 }
 
@@ -905,6 +899,11 @@ void drawMenuItem(byte menuIdx, byte state, byte signal) {
     display.setFont(font6x8);
     display.print(F("GitHub:"), 0, 18);
     display.printWrapping(GITHUB_URL, 0, 18 * 2, false);
+    return;
+    break;
+  case 6: // uptime
+    display.print(F("Uptime"), 0, 15);
+    display.printWrapping(uptimeForDisplay(), 0, 15 * 2, false);
     return;
     break;
   }
