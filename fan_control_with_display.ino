@@ -129,6 +129,11 @@ uint32_t exitMenuTimer;
 uint32_t beforeFanOnTimer;
 uint32_t fanWorkTimer; // в миллисекундах
 
+byte fanActiveMode;
+#define FAN_INACTIVE 0
+#define FAN_ACTIVE_PERM 1
+#define FAN_ACTIVE_TIMER 2
+
 bool isFanOnRepeat;
 
 uint32_t menuSavedMarkTimer = 0;
@@ -433,8 +438,8 @@ void loop() {
   }
 
   // таймер задержки перед включением реле
-  if (fanWorkTimer == 0 && \ 
-    (
+  if (fanWorkTimer == 0 && fanActiveMode == FAN_INACTIVE &&
+      (
           // задержка не установлена
           currentDelayBeforeFanOn == 0 ||
           // или таймер задержки вышел
@@ -444,12 +449,17 @@ void loop() {
       //
   ) {
     if (gLight > currentFanOnSensorLevel) {
-      // установить значение таймера длительности работы вытяжки
-      setFanWorkTimer();
       // включить реле
       digitalWrite(RELAY_PIN, true);
       debugln(F("RELAY on"));
+      fanActiveMode = FAN_ACTIVE_PERM;
     }
+  }
+
+  if (fanActiveMode == FAN_ACTIVE_PERM && gLight < currentFanOnSensorLevel) {
+    // установить значение таймера длительности работы вытяжки
+    setFanWorkTimer();
+    fanActiveMode = FAN_ACTIVE_TIMER;
   }
 
   // таймер работы вытяжки
@@ -465,6 +475,7 @@ void loop() {
       digitalWrite(RELAY_PIN, false);
       debugln(F("RELAY off"));
       isFanOnRepeat = false;
+      fanActiveMode = FAN_INACTIVE;
     }
   }
 
@@ -544,42 +555,59 @@ void displayMainView() {
   display.print(currentFanOnSensorLevel);
 
   // вывод состояния на основную чать дисплея
-  if (fanWorkTimer > 0) {
+  if (fanActiveMode == FAN_ACTIVE_PERM) {
     display.setFont(fontRus12x10);
     display.print(F("ВКЛЮЧЁН"), 0, 24);
+    display.print(F("ДО ТЕМНОТЫ"), 0, 24 * 2);
+
+  } else if (fanActiveMode == FAN_ACTIVE_TIMER) {
+    display.setFont(fontRus12x10);
+    display.print(F("ВКЛЮЧЁН"), 0, 24);
+    display.print(F("ТАЙМЕР"), 0, 24 * 2);
 
     // вытяжка включена - вывод таймера до отключения
     display.setFont(mediumNumbers);
     u16 v = fanWorkTimer / 1000; // ex: 5m * 60  = 300
     byte x = display.getWidth() - countDigits(v) * display.getFontWidth();
-    display.print(fanWorkTimer / 1000, x, 24);
+    display.print(fanWorkTimer / 1000, x, 24 * 2);
 
   } else {
     if (beforeFanOnTimer > 0) {
       // вывод таймера задержки перед включением
       display.setFont(fontRus12x10);
-      display.print(F("ПАУЗА"), 0, 24);
+      display.print(F("ВКЛЮЧЕНИЕ"), 0, 24);
+      display.print(F("ОТЛОЖЕНО"), 0, 24 * 2);
       uint16_t v = beforeFanOnTimer / 1000;
       display.setFont(mediumNumbers);
       display.print(
-          v, display.getWidth() - countDigits(v) * display.getFontWidth(), 24);
+          v, display.getWidth() - countDigits(v) * display.getFontWidth(),
+          24 * 2);
     } else {
       display.setFont(fontRus12x10);
       // вытяжка выключена - состояние ожидания
-      const char *TextMainScreenWaitMode = "ОЖИДАНИЕ";
-      display.print(TextMainScreenWaitMode,
-                    getXForDisplayTextCentered(TextMainScreenWaitMode), 24);
+      display.print(F("ОЖИДАНИЕ"), 0, 24);
+      display.print(F("СВЕТА"), 0, 24 * 2);
+
+      // eyes :)
+      const __FlashStringHelper *eyes = F("o.O");
+      if (utSecond % 10 == 0) {
+        eyes = F(">_<");
+      } else if (utSecond % 2 == 0) {
+        eyes = F("O.o");
+      }
+      display.print(eyes, display.getWidth() - 3 * display.getFontWidth(),
+                    24 * 2);
     }
   }
 
-  // Вывод uptime
-  display.setFont(fontRus6x8);
-  display.invertText(false);
-  String uptime = uptimeForDisplay();
-  display.setCursor(display.getWidth() - getStrWidthForDisplay(&uptime) -
-                        (30 - utSecond / 2),
-                    display.getHeigth() - display.getFontHeight());
-  display.print(uptime);
+  //   // Вывод uptime
+  //   display.setFont(fontRus6x8);
+  //   display.invertText(false);
+  //   String uptime = uptimeForDisplay();
+  //   display.setCursor(display.getWidth() - getStrWidthForDisplay(&uptime) -
+  //                         (30 - utSecond / 2),
+  //                     display.getHeigth() - display.getFontHeight());
+  //   display.print(uptime);
 
   // Обновить экран
   display.update();
